@@ -1,7 +1,7 @@
 --[[
-	FluentLib - Windows 11 Inspired CoreGui Library (Nâng cấp UI + Animation)
+	FluentLib - Windows 11 Inspired CoreGui Library (Fixed)
 	Tác giả: Claude
-	Version: 2.1 - Fixed
+	Version: 2.2 - Fixed Icons & UI
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -12,51 +12,44 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
+-- Load icons từ Live-UI
+local IconsLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Coideinasd/Live-UI/refs/heads/main/Icons.lua"))()
+local Icons = IconsLib.assets
+
 ----------------------------------------------------------------
--- THEME (Nâng cấp với nhiều màu sắc)
+-- THEME
 ----------------------------------------------------------------
 local Theme = {
-	-- Màu chính
 	Accent          = Color3.fromRGB(0, 120, 215),
 	AccentLight     = Color3.fromRGB(76, 169, 255),
 	AccentDark      = Color3.fromRGB(0, 80, 180),
 	AccentGradient1 = Color3.fromRGB(0, 120, 215),
 	AccentGradient2 = Color3.fromRGB(108, 92, 231),
 	
-	-- Màu nền
 	Background      = Color3.fromRGB(28, 28, 30),
 	Mica            = Color3.fromRGB(40, 40, 42),
 	Glass           = Color3.fromRGB(255, 255, 255),
 	
-	-- Card
 	Card            = Color3.fromRGB(38, 38, 40),
 	CardHover       = Color3.fromRGB(48, 48, 50),
 	CardActive      = Color3.fromRGB(58, 58, 60),
 	CardBorder      = Color3.fromRGB(68, 68, 70),
 	
-	-- Text
 	TextPrimary     = Color3.fromRGB(245, 245, 245),
 	TextSecondary   = Color3.fromRGB(180, 180, 185),
 	TextMuted       = Color3.fromRGB(130, 130, 135),
-	TextDisabled    = Color3.fromRGB(80, 80, 85),
 	
-	-- Status
 	Success         = Color3.fromRGB(52, 199, 89),
-	SuccessDark     = Color3.fromRGB(30, 150, 60),
 	Danger          = Color3.fromRGB(255, 69, 58),
-	DangerDark      = Color3.fromRGB(180, 40, 30),
 	Warning         = Color3.fromRGB(255, 185, 0),
-	WarningDark     = Color3.fromRGB(200, 140, 0),
-	Info            = Color3.fromRGB(0, 164, 239),
 	
-	-- Font
 	Font            = Enum.Font.GothamMedium,
 	FontBold        = Enum.Font.GothamBold,
 	FontLight       = Enum.Font.Gotham,
 }
 
 ----------------------------------------------------------------
--- UTIL NÂNG CẤP
+-- UTIL
 ----------------------------------------------------------------
 local function create(class, props, children)
 	local inst = Instance.new(class)
@@ -76,13 +69,10 @@ local function tween(obj, info, props)
 	return t
 end
 
--- Animation configurations
 local EASE = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local EASE_FAST = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local EASE_SPRING = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-local EASE_SLOW = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Corner với transparency
 local function corner(parent, radius)
 	if not parent then return end
 	return create("UICorner", { 
@@ -91,11 +81,8 @@ local function corner(parent, radius)
 	})
 end
 
--- Gradient border (viền gradient)
-local function gradientBorder(parent, color1, color2, thickness)
+local function gradientBorder(parent, color1, color2)
 	if not parent then return end
-	
-	-- Xóa stroke cũ nếu có
 	local oldStroke = parent:FindFirstChild("UIStroke")
 	if oldStroke then oldStroke:Destroy() end
 	
@@ -120,7 +107,6 @@ local function gradientBorder(parent, color1, color2, thickness)
 	})
 	
 	corner(border, 8)
-	
 	return border
 end
 
@@ -137,15 +123,12 @@ end
 local function padding(parent, all)
 	if not parent then return end
 	create("UIPadding", {
-		PaddingTop = UDim.new(0, all), 
-		PaddingBottom = UDim.new(0, all),
-		PaddingLeft = UDim.new(0, all), 
-		PaddingRight = UDim.new(0, all),
+		PaddingTop = UDim.new(0, all), PaddingBottom = UDim.new(0, all),
+		PaddingLeft = UDim.new(0, all), PaddingRight = UDim.new(0, all),
 		Parent = parent,
 	})
 end
 
--- Ripple effect nâng cấp
 local function ripple(button, x, y, color)
 	if not button then return end
 	local rip = create("Frame", {
@@ -158,7 +141,6 @@ local function ripple(button, x, y, color)
 		ZIndex = 50,
 		Parent = button,
 	})
-	
 	corner(rip, 999)
 	
 	local maxSize = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 2.5
@@ -186,56 +168,6 @@ local function hoverFeedback(obj, baseColor, hoverColor)
 		tween(obj, EASE_FAST, { BackgroundColor3 = baseColor })
 	end)
 end
-
--- Shine effect (FIXED - không dùng :Wait())
-local function shineEffect(parent)
-	if not parent then return end
-	local shine = create("Frame", {
-		Name = "Shine",
-		Size = UDim2.fromScale(0.3, 1),
-		Position = UDim2.fromScale(-0.3, 0),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BackgroundTransparency = 0.9,
-		Rotation = 25,
-		ZIndex = 10,
-		Parent = parent,
-	})
-	
-	-- Animation shine chạy liên tục (FIXED)
-	task.spawn(function()
-		while parent and parent.Parent and shine and shine.Parent do
-			local tweenObj = tween(shine, TweenInfo.new(3, Enum.EasingStyle.Linear), { 
-				Position = UDim2.fromScale(1.3, 0) 
-			})
-			if tweenObj then
-				task.wait(3.2)
-			else
-				break
-			end
-			task.wait(2)
-			if shine and shine.Parent then
-				shine.Position = UDim2.fromScale(-0.3, 0)
-			else
-				break
-			end
-		end
-	end)
-	
-	return shine
-end
-
-----------------------------------------------------------------
--- ICONS (Sử dụng rbxassetid)
-----------------------------------------------------------------
-local Icons = {
-	Close = "rbxasset://textures/ui/TopBar/close.png",
-	Minimize = "rbxasset://textures/ui/TopBar/minimize.png",
-	Maximize = "rbxasset://textures/ui/TopBar/maximize.png",
-	Left = "rbxasset://textures/ui/Animation/Back.png",
-	Right = "rbxasset://textures/ui/Animation/Next.png",
-	Up = "rbxasset://textures/ui/InspectMenu/ArrowUp.png",
-	Down = "rbxasset://textures/ui/InspectMenu/ArrowDown.png",
-}
 
 ----------------------------------------------------------------
 -- LIBRARY ROOT
@@ -277,7 +209,6 @@ function Library.new(title)
 	})
 	corner(main, 16)
 	
-	-- Glass background
 	local glassBg = create("Frame", {
 		Name = "GlassBg",
 		Size = UDim2.fromScale(1, 1),
@@ -288,8 +219,7 @@ function Library.new(title)
 	})
 	corner(glassBg, 16)
 	
-	-- Gradient border
-	gradientBorder(main, Theme.AccentGradient1, Theme.AccentGradient2, 2)
+	gradientBorder(main, Theme.AccentGradient1, Theme.AccentGradient2)
 	
 	self.Main = main
 
@@ -301,18 +231,14 @@ function Library.new(title)
 		Parent = main,
 	})
 	
-	-- Title bar shine
-	shineEffect(titleBar)
-	
-	-- Icon và Title
+	-- Icon
 	local titleIcon = create("ImageLabel", {
-		Image = Icons.Left,
+		Image = Icons["lucide-activity"],
 		ImageColor3 = Theme.Accent,
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(18, 0),
-		Size = UDim2.new(0, 24, 0, 24),
-		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.fromOffset(18, 27),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Size = UDim2.new(0, 24, 0, 24),
 		Parent = titleBar,
 	})
 	
@@ -328,7 +254,7 @@ function Library.new(title)
 		Parent = titleBar,
 	})
 
-	-- Window Controls
+	-- Window Controls với icons từ Live-UI
 	local controls = create("Frame", {
 		Name = "Controls",
 		Size = UDim2.new(0, 130, 1, 0),
@@ -337,9 +263,9 @@ function Library.new(title)
 		Parent = titleBar,
 	})
 	
-	local function createControlBtn(image, hoverColor, callback)
+	local function createControlBtn(icon, hoverColor, callback)
 		local btn = create("ImageButton", {
-			Image = image,
+			Image = icon,
 			ImageColor3 = Theme.TextSecondary,
 			BackgroundColor3 = Theme.Background,
 			BackgroundTransparency = 1,
@@ -366,15 +292,18 @@ function Library.new(title)
 		return btn
 	end
 	
-	createControlBtn(Icons.Minimize, nil, function()
+	-- Minimize
+	createControlBtn(Icons["lucide-minus"], nil, function()
 		tween(main, EASE, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
 		task.wait(0.3)
 		self.Main.Visible = false
 	end)
 	
-	createControlBtn(Icons.Maximize, nil, function() end)
+	-- Maximize
+	createControlBtn(Icons["lucide-maximize"], nil, function() end)
 	
-	createControlBtn(Icons.Close, Theme.Danger, function()
+	-- Close
+	createControlBtn(Icons["lucide-x"], Theme.Danger, function()
 		tween(main, EASE_SPRING, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
 		task.wait(0.35)
 		gui:Destroy()
@@ -441,7 +370,7 @@ function Library.new(title)
 	padding(sidebar, 12)
 	self.Sidebar = sidebar
 
-	-- Divider với gradient
+	-- Divider
 	local divider = create("Frame", {
 		Name = "Divider",
 		Size = UDim2.new(0, 2, 1, -54),
@@ -563,17 +492,15 @@ function Library:CreateTab(name, icon)
 		Parent = page,
 	})
 	corner(searchContainer, 12)
-	gradientBorder(searchContainer, Theme.AccentGradient1, Theme.AccentGradient2, 1)
+	gradientBorder(searchContainer, Theme.AccentGradient1, Theme.AccentGradient2)
 	
-	create("TextLabel", {
-		Text = "🔍",
-		Font = Theme.Font,
-		TextSize = 16,
-		TextColor3 = Theme.TextMuted,
+	-- Search icon
+	local searchIcon = create("ImageLabel", {
+		Image = Icons["lucide-search"],
+		ImageColor3 = Theme.TextMuted,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(12, 0),
-		Size = UDim2.new(0, 30, 1, 0),
-		TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.new(0, 20, 1, 0),
 		Parent = searchContainer,
 	})
 	
@@ -640,7 +567,6 @@ function Library:CreateTab(name, icon)
 		Elements = {},
 	}
 
-	-- Search filter
 	searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 		local q = searchBox.Text:lower()
 		clearBtn.Visible = q ~= ""
@@ -687,7 +613,6 @@ function Library:CreateTab(name, icon)
 		})
 		corner(card, 12)
 		
-		-- Glass effect
 		local glass = create("Frame", {
 			Size = UDim2.fromScale(1, 1),
 			BackgroundColor3 = Theme.Glass,
@@ -698,12 +623,11 @@ function Library:CreateTab(name, icon)
 		corner(glass, 12)
 		
 		if hasGradient then
-			gradientBorder(card, Theme.AccentGradient1, Theme.AccentGradient2, 1)
+			gradientBorder(card, Theme.AccentGradient1, Theme.AccentGradient2)
 		else
 			stroke(card, Theme.CardBorder, 1, 0.3)
 		end
 		
-		-- Fade in animation (FIXED - không dùng FadeIn)
 		card.BackgroundTransparency = 0.5
 		card.Size = UDim2.new(1, 0, 0, 0)
 		tween(card, EASE_SPRING, { 
@@ -773,8 +697,8 @@ function Library:CreateTab(name, icon)
 				highlightFrame.Position = UDim2.fromOffset(16 + beforeWidth, 36)
 				highlightFrame.Size = UDim2.new(0, textBounds.X * (#highlight / #desc) + 8, 0, 22)
 				
-				tween(highlightFrame, EASE_SLOW, { BackgroundTransparency = 0.7 })
-				tween(highlightFrame, EASE_SLOW, { BackgroundTransparency = 0.85 })
+				tween(highlightFrame, EASE_SLOW or EASE, { BackgroundTransparency = 0.7 })
+				tween(highlightFrame, EASE_SLOW or EASE, { BackgroundTransparency = 0.85 })
 			end)
 		end
 
@@ -822,7 +746,7 @@ function Library:CreateTab(name, icon)
 			Parent = card,
 		})
 
-		local titleLabel = create("TextLabel", {
+		create("TextLabel", {
 			Text = "⚙️ " .. name,
 			Font = Theme.Font,
 			TextSize = 14,
@@ -904,11 +828,9 @@ function Library:CreateTab(name, icon)
 		local arrowOpen = false
 		
 		if hasConfig then
-			local arrowBtn = create("TextButton", {
-				Text = "▾",
-				Font = Theme.FontBold,
-				TextSize = 16,
-				TextColor3 = Theme.TextSecondary,
+			local arrowBtn = create("ImageButton", {
+				Image = Icons["lucide-chevron-down"],
+				ImageColor3 = Theme.TextSecondary,
 				BackgroundTransparency = 1,
 				Size = UDim2.fromOffset(32, 32),
 				Position = UDim2.new(1, -32, 0.5, 0),
@@ -916,10 +838,10 @@ function Library:CreateTab(name, icon)
 				Parent = row,
 			})
 			arrowBtn.MouseEnter:Connect(function()
-				tween(arrowBtn, EASE_FAST, { TextColor3 = Theme.TextPrimary })
+				tween(arrowBtn, EASE_FAST, { ImageColor3 = Theme.TextPrimary })
 			end)
 			arrowBtn.MouseLeave:Connect(function()
-				tween(arrowBtn, EASE_FAST, { TextColor3 = Theme.TextSecondary })
+				tween(arrowBtn, EASE_FAST, { ImageColor3 = Theme.TextSecondary })
 			end)
 
 			configFrame = create("Frame", {
@@ -1171,14 +1093,12 @@ function Library:CreateTab(name, icon)
 			Parent = header,
 		})
 		
-		local arrow = create("TextLabel", {
-			Text = "▾",
-			Font = Theme.FontBold, 
-			TextSize = 16, 
-			TextColor3 = Theme.TextSecondary,
+		local arrow = create("ImageLabel", {
+			Image = Icons["lucide-chevron-down"],
+			ImageColor3 = Theme.TextSecondary,
 			BackgroundTransparency = 1,
 			Position = UDim2.new(1, -32, 0, 0),
-			Size = UDim2.new(0, 28, 1, 0),
+			Size = UDim2.new(0, 24, 1, 0),
 			Parent = header,
 		})
 
@@ -1234,16 +1154,14 @@ function Library:CreateTab(name, icon)
 					tween(optBtn, EASE_FAST, { BackgroundTransparency = selected[item] and 0.3 or 1 })
 				end)
 				
-				local checkmark = create("TextLabel", {
-					Text = selected[item] and "✓" or "",
-					Font = Theme.FontBold,
-					TextSize = 14,
-					TextColor3 = Theme.Accent,
+				local checkmark = create("ImageLabel", {
+					Image = Icons["lucide-check"],
+					ImageColor3 = Theme.Accent,
 					BackgroundTransparency = 1,
 					Position = UDim2.new(1, -26, 0.5, 0),
 					AnchorPoint = Vector2.new(0, 0.5),
-					Size = UDim2.new(0, 20, 1, 0),
-					TextXAlignment = Enum.TextXAlignment.Center,
+					Size = UDim2.new(0, 16, 0, 16),
+					Visible = selected[item] and true or false,
 					Parent = optBtn,
 				})
 				
@@ -1576,8 +1494,6 @@ function Library:CreateTab(name, icon)
 			Parent = card,
 		})
 		corner(btn, 10)
-		
-		shineEffect(btn)
 
 		btn.MouseEnter:Connect(function()
 			tween(btn, EASE_FAST, { 
