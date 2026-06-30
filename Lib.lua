@@ -1,16 +1,16 @@
 --[[
-	FluentLib - Windows 11 Inspired CoreGui Library (Nâng cấp)
+	FluentLib - Windows 11 Inspired CoreGui Library (Nâng cấp đầy đủ)
 	Tác giả: Claude
 	Mô tả: Thư viện UI lấy cảm hứng từ Windows 11 với đầy đủ tính năng
 	
 	Thành phần hỗ trợ:
 		- Window / Tab (có thanh tìm kiếm riêng cho từng Tab)
-		- Paragraph (với description)
+		- Paragraph (với description và highlight)
 		- Toggle (có mũi tên mở rộng Config Toggle con)
 		- Dropdown (Single / Multi) dùng List_Table làm nguồn dữ liệu
 		- Slider
 		- Textbox
-		- Button
+		- Button (primary, secondary, success, danger)
 		- Search feature cho từng tab
 ]]
 
@@ -543,21 +543,6 @@ function Library:CreateTab(name, icon)
 		})
 		corner(card, 10)
 		stroke(card, Theme.Stroke, 1, 0.4)
-		
-		if title and description then
-			create("TextLabel", {
-				Text = description,
-				Font = Theme.Font,
-				TextSize = 12,
-				TextColor3 = Theme.TextSecondary,
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(14, 24),
-				Size = UDim2.new(1, -20, 0, 18),
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Parent = card,
-			})
-		end
-		
 		return card
 	end
 
@@ -605,7 +590,6 @@ function Library:CreateTab(name, icon)
 		
 		-- Highlight effect
 		if highlight and desc:find(highlight) then
-			-- Tạo highlight background (hiệu ứng glow)
 			local highlightFrame = create("Frame", {
 				Size = UDim2.new(0, 0, 0, 20),
 				Position = UDim2.fromOffset(0, 32),
@@ -615,7 +599,6 @@ function Library:CreateTab(name, icon)
 			})
 			corner(highlightFrame, 4)
 			
-			-- Tính toán vị trí của highlight trong text (approximate)
 			task.defer(function()
 				local textBounds = descLabel.TextBounds
 				local textBefore = desc:sub(1, desc:find(highlight) - 1)
@@ -662,7 +645,7 @@ function Library:CreateTab(name, icon)
 		local state = default
 		local expanded = false
 
-		local card = newCard(44, name)
+		local card = newCard(44)
 
 		local row = create("Frame", {
 			Size = UDim2.new(1, 0, 0, 44),
@@ -701,7 +684,6 @@ function Library:CreateTab(name, icon)
 		})
 		corner(knob, 9)
 		
-		-- Shadow cho knob
 		create("Frame", {
 			Name = "KnobShadow",
 			Size = UDim2.fromOffset(20, 20),
@@ -842,7 +824,8 @@ function Library:CreateTab(name, icon)
 							val = math.floor(min + (max - min) * rel)
 							fill.Size = UDim2.new(rel, 0, 1, 0)
 							if c.Callback then task.spawn(c.Callback, val) end
-						end					end)
+						end
+					end)
 
 				elseif c.Type == "Textbox" then
 					local tb = create("TextBox", {
@@ -904,7 +887,7 @@ function Library:CreateTab(name, icon)
 			end
 		end
 
-		local card = newCard(44, name)
+		local card = newCard(44)
 		local header = create("TextButton", {
 			Text = "",
 			AutoButtonColor = false,
@@ -980,7 +963,6 @@ function Library:CreateTab(name, icon)
 				})
 				corner(optBtn, 6)
 				
-				-- Checkmark cho item được chọn
 				local checkmark = create("TextLabel", {
 					Text = selected[item] and "✓" or "",
 					Font = Theme.FontBold,
@@ -1080,7 +1062,7 @@ function Library:CreateTab(name, icon)
 		local suffix = opts.Suffix or ""
 		local callback = opts.Callback or function() end
 
-		local card = newCard(56, name)
+		local card = newCard(56)
 		create("TextLabel", {
 			Text = name,
 			Font = Theme.Font, TextSize = 14, TextColor3 = Theme.TextPrimary,
@@ -1179,7 +1161,7 @@ function Library:CreateTab(name, icon)
 		local placeholder = opts.Placeholder or "Nhập..."
 		local callback = opts.Callback or function() end
 
-		local card = newCard(48, name)
+		local card = newCard(48)
 		create("TextLabel", {
 			Text = name,
 			Font = Theme.Font, TextSize = 14, TextColor3 = Theme.TextPrimary,
@@ -1223,7 +1205,7 @@ function Library:CreateTab(name, icon)
 	end
 
 	----------------------------------------------------------------
-	-- BUTTON (nâng cấp)
+	-- BUTTON (Nâng cấp - Thêm variants)
 	----------------------------------------------------------------
 	function Tab:CreateButton(opts)
 		opts = opts or {}
@@ -1231,17 +1213,40 @@ function Library:CreateTab(name, icon)
 		local callback = opts.Callback or function() end
 		local variant = opts.Variant or "primary" -- primary, secondary, success, danger
 
-		local card = newCard(46, name)
+		-- Tính chiều cao dựa trên nội dung
+		local cardHeight = 50
+		if opts.Description then
+			cardHeight = 70
+		end
+		
+		local card = newCard(cardHeight)
+		
+		if opts.Description then
+			create("TextLabel", {
+				Text = opts.Description,
+				Font = Theme.FontLight,
+				TextSize = 12,
+				TextColor3 = Theme.TextSecondary,
+				BackgroundTransparency = 1,
+				Position = UDim2.fromOffset(14, 6),
+				Size = UDim2.new(1, -20, 0, 18),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Parent = card,
+			})
+		end
+		
 		local btn = create("TextButton", {
 			Text = name,
 			AutoButtonColor = false,
-			Font = Theme.FontBold, TextSize = 14, TextColor3 = Theme.TextPrimary,
+			Font = Theme.FontBold, 
+			TextSize = 14, 
+			TextColor3 = (variant == "primary" or variant == "success") and Theme.TextPrimary or Theme.TextPrimary,
 			BackgroundColor3 = variant == "danger" and Theme.Danger or 
 							   variant == "success" and Theme.Success or 
 							   variant == "secondary" and Theme.CardHover or 
 							   Theme.Accent,
-			Size = UDim2.new(1, -16, 1, -10),
-			Position = UDim2.fromOffset(8, 5),
+			Size = UDim2.new(1, -16, 0, 34),
+			Position = opts.Description and UDim2.fromOffset(8, 28) or UDim2.fromOffset(8, 8),
 			ClipsDescendants = true,
 			Parent = card,
 		})
@@ -1264,10 +1269,16 @@ function Library:CreateTab(name, icon)
 			})
 		end)
 		btn.MouseButton1Down:Connect(function()
-			tween(btn, EASE_FAST, { Size = UDim2.new(1, -20, 1, -14), Position = UDim2.fromOffset(10, 7) })
+			tween(btn, EASE_FAST, { 
+				Size = UDim2.new(1, -20, 0, 30), 
+				Position = opts.Description and UDim2.fromOffset(10, 30) or UDim2.fromOffset(10, 10) 
+			})
 		end)
 		btn.MouseButton1Up:Connect(function()
-			tween(btn, EASE_FAST, { Size = UDim2.new(1, -16, 1, -10), Position = UDim2.fromOffset(8, 5) })
+			tween(btn, EASE_FAST, { 
+				Size = UDim2.new(1, -16, 0, 34), 
+				Position = opts.Description and UDim2.fromOffset(8, 28) or UDim2.fromOffset(8, 8) 
+			})
 		end)
 		btn.MouseButton1Click:Connect(function()
 			ripple(btn, Mouse.X - btn.AbsolutePosition.X, Mouse.Y - btn.AbsolutePosition.Y)
@@ -1275,8 +1286,10 @@ function Library:CreateTab(name, icon)
 		end)
 		btn.BackgroundTransparency = 0
 
-		table.insert(self.Elements, { Frame = card, SearchText = name, Type = "Button" })
-		return { }
+		table.insert(self.Elements, { Frame = card, SearchText = name .. " " .. (opts.Description or ""), Type = "Button" })
+		return { 
+			SetText = function(_, v) btn.Text = v end,
+		}
 	end
 
 	return Tab
