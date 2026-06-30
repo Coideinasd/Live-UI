@@ -1,22 +1,13 @@
 --[[
 	FluentLib - Windows 11 Inspired CoreGui Library (Nâng cấp UI + Animation)
 	Tác giả: Claude
-	Version: 2.0
-	
-	Đặc điểm nổi bật:
-		- Gradient viền cho card
-		- Animation mượt mà hơn
-		- Config Toggle với nhiều sub-option
-		- Hiệu ứng Glass/Transparency
-		- Ripple effects đẹp hơn
-		- Hover/Click animations
+	Version: 2.1 - Fixed
 ]]
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
@@ -79,6 +70,7 @@ local function create(class, props, children)
 end
 
 local function tween(obj, info, props)
+	if not obj then return end
 	local t = TweenService:Create(obj, info, props)
 	t:Play()
 	return t
@@ -89,22 +81,24 @@ local EASE = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out
 local EASE_FAST = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local EASE_SPRING = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local EASE_SLOW = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local EASE_BOUNCE = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Corner với transparency
-local function corner(parent, radius, transparency)
-	local corner = create("UICorner", { 
+local function corner(parent, radius)
+	if not parent then return end
+	return create("UICorner", { 
 		CornerRadius = UDim.new(0, radius or 8), 
 		Parent = parent 
 	})
-	if transparency then
-		corner.Transparency = transparency
-	end
-	return corner
 end
 
 -- Gradient border (viền gradient)
 local function gradientBorder(parent, color1, color2, thickness)
+	if not parent then return end
+	
+	-- Xóa stroke cũ nếu có
+	local oldStroke = parent:FindFirstChild("UIStroke")
+	if oldStroke then oldStroke:Destroy() end
+	
 	local border = create("Frame", {
 		Name = "GradientBorder",
 		Size = UDim2.new(1, 2, 1, 2),
@@ -115,7 +109,7 @@ local function gradientBorder(parent, color1, color2, thickness)
 		Parent = parent,
 	})
 	
-	local gradient = create("UIGradient", {
+	create("UIGradient", {
 		Color = ColorSequence.new({
 			ColorSequenceKeypoint.new(0, color1 or Theme.AccentGradient1),
 			ColorSequenceKeypoint.new(0.5, color2 or Theme.AccentGradient2),
@@ -127,35 +121,11 @@ local function gradientBorder(parent, color1, color2, thickness)
 	
 	corner(border, 8)
 	
-	-- Nếu có stroke cũ thì xóa
-	local oldStroke = parent:FindFirstChild("UIStroke")
-	if oldStroke then oldStroke:Destroy() end
-	
 	return border
 end
 
--- Glass effect
-local function glassEffect(parent, transparency)
-	local glass = create("Frame", {
-		Name = "GlassEffect",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = Theme.Glass,
-		BackgroundTransparency = transparency or 0.9,
-		ZIndex = 0,
-		Parent = parent,
-	})
-	corner(glass, 8)
-	
-	-- Blur effect (nếu có)
-	local blur = create("BlurEffect", {
-		Size = 8,
-		Parent = glass,
-	})
-	
-	return glass
-end
-
 local function stroke(parent, color, thickness, transparency)
+	if not parent then return end
 	create("UIStroke", {
 		Color = color or Theme.CardBorder,
 		Thickness = thickness or 1,
@@ -165,15 +135,19 @@ local function stroke(parent, color, thickness, transparency)
 end
 
 local function padding(parent, all)
+	if not parent then return end
 	create("UIPadding", {
-		PaddingTop = UDim.new(0, all), PaddingBottom = UDim.new(0, all),
-		PaddingLeft = UDim.new(0, all), PaddingRight = UDim.new(0, all),
+		PaddingTop = UDim.new(0, all), 
+		PaddingBottom = UDim.new(0, all),
+		PaddingLeft = UDim.new(0, all), 
+		PaddingRight = UDim.new(0, all),
 		Parent = parent,
 	})
 end
 
 -- Ripple effect nâng cấp
 local function ripple(button, x, y, color)
+	if not button then return end
 	local rip = create("Frame", {
 		Name = "Ripple",
 		BackgroundColor3 = color or Color3.new(1, 1, 1),
@@ -185,39 +159,37 @@ local function ripple(button, x, y, color)
 		Parent = button,
 	})
 	
-	local cornerInst = corner(rip, 999)
+	corner(rip, 999)
 	
-	-- Animation ripple
 	local maxSize = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 2.5
 	tween(rip, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Size = UDim2.fromOffset(maxSize, maxSize),
 		BackgroundTransparency = 1,
 	})
 	
-	-- Fade out
 	task.delay(0.6, function() 
-		tween(rip, EASE_FAST, { BackgroundTransparency = 1 })
-		task.delay(0.15, function() rip:Destroy() end)
+		if rip and rip.Parent then
+			tween(rip, EASE_FAST, { BackgroundTransparency = 1 })
+			task.delay(0.15, function() 
+				if rip and rip.Parent then rip:Destroy() end 
+			end)
+		end
 	end)
 end
 
-local function hoverFeedback(obj, baseColor, hoverColor, scale)
+local function hoverFeedback(obj, baseColor, hoverColor)
+	if not obj then return end
 	obj.MouseEnter:Connect(function()
 		tween(obj, EASE_FAST, { BackgroundColor3 = hoverColor })
-		if scale then
-			tween(obj, EASE_FAST, { Size = UDim2.new(1, 0, 1, scale) })
-		end
 	end)
 	obj.MouseLeave:Connect(function()
 		tween(obj, EASE_FAST, { BackgroundColor3 = baseColor })
-		if scale then
-			tween(obj, EASE_FAST, { Size = UDim2.new(1, 0, 1, 0) })
-		end
 	end)
 end
 
--- Shine effect
+-- Shine effect (FIXED - không dùng :Wait())
 local function shineEffect(parent)
+	if not parent then return end
 	local shine = create("Frame", {
 		Name = "Shine",
 		Size = UDim2.fromScale(0.3, 1),
@@ -229,23 +201,44 @@ local function shineEffect(parent)
 		Parent = parent,
 	})
 	
-	-- Animation shine chạy liên tục
-	local function animateShine()
-		while parent and parent.Parent do
-			tween(shine, TweenInfo.new(3, Enum.EasingStyle.Linear), { 
+	-- Animation shine chạy liên tục (FIXED)
+	task.spawn(function()
+		while parent and parent.Parent and shine and shine.Parent do
+			local tweenObj = tween(shine, TweenInfo.new(3, Enum.EasingStyle.Linear), { 
 				Position = UDim2.fromScale(1.3, 0) 
-			}):Wait()
+			})
+			if tweenObj then
+				task.wait(3.2)
+			else
+				break
+			end
 			task.wait(2)
-			shine.Position = UDim2.fromScale(-0.3, 0)
+			if shine and shine.Parent then
+				shine.Position = UDim2.fromScale(-0.3, 0)
+			else
+				break
+			end
 		end
-	end
-	task.spawn(animateShine)
+	end)
 	
 	return shine
 end
 
 ----------------------------------------------------------------
--- LIBRARY ROOT (Nâng cấp UI)
+-- ICONS (Sử dụng rbxassetid)
+----------------------------------------------------------------
+local Icons = {
+	Close = "rbxasset://textures/ui/TopBar/close.png",
+	Minimize = "rbxasset://textures/ui/TopBar/minimize.png",
+	Maximize = "rbxasset://textures/ui/TopBar/maximize.png",
+	Left = "rbxasset://textures/ui/Animation/Back.png",
+	Right = "rbxasset://textures/ui/Animation/Next.png",
+	Up = "rbxasset://textures/ui/InspectMenu/ArrowUp.png",
+	Down = "rbxasset://textures/ui/InspectMenu/ArrowDown.png",
+}
+
+----------------------------------------------------------------
+-- LIBRARY ROOT
 ----------------------------------------------------------------
 local Library = {}
 Library.__index = Library
@@ -271,7 +264,7 @@ function Library.new(title)
 	self.Tabs = {}
 	self.ActiveTab = nil
 
-	-- MAIN WINDOW với Glass Effect
+	-- MAIN WINDOW
 	local main = create("Frame", {
 		Name = "Main",
 		Size = UDim2.fromOffset(720, 520),
@@ -300,7 +293,7 @@ function Library.new(title)
 	
 	self.Main = main
 
-	-- TITLEBAR với animation
+	-- TITLEBAR
 	local titleBar = create("Frame", {
 		Name = "TitleBar",
 		Size = UDim2.new(1, 0, 0, 54),
@@ -312,15 +305,14 @@ function Library.new(title)
 	shineEffect(titleBar)
 	
 	-- Icon và Title
-	local titleIcon = create("TextLabel", {
-		Text = "✦",
-		Font = Theme.Font,
-		TextSize = 20,
-		TextColor3 = Theme.Accent,
+	local titleIcon = create("ImageLabel", {
+		Image = Icons.Left,
+		ImageColor3 = Theme.Accent,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(18, 0),
-		Size = UDim2.new(0, 32, 1, 0),
-		TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.new(0, 24, 0, 24),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromOffset(18, 27),
 		Parent = titleBar,
 	})
 	
@@ -336,7 +328,7 @@ function Library.new(title)
 		Parent = titleBar,
 	})
 
-	-- Window Controls (Win11 style)
+	-- Window Controls
 	local controls = create("Frame", {
 		Name = "Controls",
 		Size = UDim2.new(0, 130, 1, 0),
@@ -345,12 +337,10 @@ function Library.new(title)
 		Parent = titleBar,
 	})
 	
-	local function createControlBtn(text, hoverColor, callback)
-		local btn = create("TextButton", {
-			Text = text,
-			Font = Theme.Font,
-			TextSize = text == "☐" and 14 or 16,
-			TextColor3 = Theme.TextSecondary,
+	local function createControlBtn(image, hoverColor, callback)
+		local btn = create("ImageButton", {
+			Image = image,
+			ImageColor3 = Theme.TextSecondary,
 			BackgroundColor3 = Theme.Background,
 			BackgroundTransparency = 1,
 			Size = UDim2.fromOffset(34, 34),
@@ -363,38 +353,36 @@ function Library.new(title)
 			tween(btn, EASE_FAST, { 
 				BackgroundTransparency = 0.2,
 				BackgroundColor3 = hoverColor or Theme.CardHover,
-				TextColor3 = Theme.TextPrimary,
+				ImageColor3 = Theme.TextPrimary,
 			})
 		end)
 		btn.MouseLeave:Connect(function()
 			tween(btn, EASE_FAST, { 
 				BackgroundTransparency = 1,
-				TextColor3 = Theme.TextSecondary,
+				ImageColor3 = Theme.TextSecondary,
 			})
 		end)
 		btn.MouseButton1Click:Connect(callback)
 		return btn
 	end
 	
-	createControlBtn("─", nil, function()
+	createControlBtn(Icons.Minimize, nil, function()
 		tween(main, EASE, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
 		task.wait(0.3)
 		self.Main.Visible = false
 	end)
 	
-	createControlBtn("☐", nil, function()
-		-- Maximize/restore
-	end)
+	createControlBtn(Icons.Maximize, nil, function() end)
 	
-	local closeBtn = createControlBtn("✕", Theme.Danger, function()
+	createControlBtn(Icons.Close, Theme.Danger, function()
 		tween(main, EASE_SPRING, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
 		task.wait(0.35)
 		gui:Destroy()
 	end)
 
-	-- DRAG nâng cấp
+	-- DRAG
 	do
-		local dragging, dragStart, startPos, currentPos
+		local dragging, dragStart, startPos
 		titleBar.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				dragging = true
@@ -426,7 +414,6 @@ function Library.new(title)
 		Parent = main,
 	})
 	
-	-- Sidebar header
 	local sidebarHeader = create("Frame", {
 		Name = "SidebarHeader",
 		Size = UDim2.new(1, 0, 0, 40),
@@ -507,7 +494,7 @@ function Library.new(title)
 end
 
 ----------------------------------------------------------------
--- TAB (Nâng cấp)
+-- TAB
 ----------------------------------------------------------------
 function Library:CreateTab(name, icon)
 	local self_ = self
@@ -545,7 +532,6 @@ function Library:CreateTab(name, icon)
 	})
 	corner(indicator, 2)
 	
-	-- Hover animation
 	tabBtn.MouseEnter:Connect(function()
 		if tabBtn ~= self_.ActiveTab and self_.ActiveTab then
 			tween(tabBtn, EASE_FAST, { BackgroundTransparency = 0.7 })
@@ -662,9 +648,6 @@ function Library:CreateTab(name, icon)
 		for _, el in ipairs(Tab.Elements) do
 			if q == "" then
 				el.Frame.Visible = true
-				if el.Frame:FindFirstChild("FadeIn") then
-					el.Frame.FadeIn:Play()
-				end
 			else
 				local match = el.SearchText:lower():find(q, 1, true)
 				el.Frame.Visible = match and true or false
@@ -692,7 +675,7 @@ function Library:CreateTab(name, icon)
 	if #self.Tabs == 1 then selectTab() end
 
 	----------------------------------------------------------------
-	-- Helper: Card với gradient border và animation
+	-- Helper: Card
 	----------------------------------------------------------------
 	local function newCard(height, hasGradient)
 		local card = create("Frame", {
@@ -720,20 +703,19 @@ function Library:CreateTab(name, icon)
 			stroke(card, Theme.CardBorder, 1, 0.3)
 		end
 		
-		-- Fade in animation khi xuất hiện
+		-- Fade in animation (FIXED - không dùng FadeIn)
 		card.BackgroundTransparency = 0.5
 		card.Size = UDim2.new(1, 0, 0, 0)
-		local fadeIn = tween(card, EASE_SPRING, { 
+		tween(card, EASE_SPRING, { 
 			Size = UDim2.new(1, 0, 0, height or 50),
 			BackgroundTransparency = 0.9 
 		})
-		card.FadeIn = fadeIn
 		
 		return card
 	end
 
 	----------------------------------------------------------------
-	-- PARAGRAPH (Nâng cấp)
+	-- PARAGRAPH
 	----------------------------------------------------------------
 	function Tab:CreateParagraph(opts)
 		opts = opts or {}
@@ -784,13 +766,13 @@ function Library:CreateTab(name, icon)
 			corner(highlightFrame, 4)
 			
 			task.defer(function()
+				if not descLabel or not descLabel.Parent then return end
 				local textBounds = descLabel.TextBounds
 				local textBefore = desc:sub(1, desc:find(highlight) - 1)
 				local beforeWidth = textBounds.X * (#textBefore / #desc)
 				highlightFrame.Position = UDim2.fromOffset(16 + beforeWidth, 36)
 				highlightFrame.Size = UDim2.new(0, textBounds.X * (#highlight / #desc) + 8, 0, 22)
 				
-				-- Glow effect
 				tween(highlightFrame, EASE_SLOW, { BackgroundTransparency = 0.7 })
 				tween(highlightFrame, EASE_SLOW, { BackgroundTransparency = 0.85 })
 			end)
@@ -820,7 +802,7 @@ function Library:CreateTab(name, icon)
 	end
 
 	----------------------------------------------------------------
-	-- TOGGLE với Config (Nâng cấp - Farm toggles)
+	-- TOGGLE với Config
 	----------------------------------------------------------------
 	function Tab:CreateToggle(opts)
 		opts = opts or {}
@@ -830,6 +812,7 @@ function Library:CreateTab(name, icon)
 		local hasConfig = opts.Config ~= nil and #opts.Config > 0
 
 		local state = default
+		local subControls = {}
 
 		local card = newCard(50, hasConfig)
 
@@ -839,7 +822,6 @@ function Library:CreateTab(name, icon)
 			Parent = card,
 		})
 
-		-- Title với icon
 		local titleLabel = create("TextLabel", {
 			Text = "⚙️ " .. name,
 			Font = Theme.Font,
@@ -852,7 +834,7 @@ function Library:CreateTab(name, icon)
 			Parent = row,
 		})
 
-		-- Switch (Win11 toggle style nâng cấp)
+		-- Switch
 		local switchBg = create("Frame", {
 			Size = UDim2.fromOffset(48, 26),
 			Position = UDim2.new(1, hasConfig and -82 or -58, 0.5, 0),
@@ -862,7 +844,6 @@ function Library:CreateTab(name, icon)
 		})
 		corner(switchBg, 13)
 		
-		-- Glow effect khi bật
 		local glow = create("Frame", {
 			Size = UDim2.fromScale(1.3, 1.3),
 			Position = UDim2.fromScale(-0.15, -0.15),
@@ -882,7 +863,6 @@ function Library:CreateTab(name, icon)
 		})
 		corner(knob, 10)
 		
-		-- Knob shadow
 		create("Frame", {
 			Name = "KnobShadow",
 			Size = UDim2.fromOffset(22, 22),
@@ -919,7 +899,7 @@ function Library:CreateTab(name, icon)
 			ripple(switchBtn, Mouse.X - switchBtn.AbsolutePosition.X, Mouse.Y - switchBtn.AbsolutePosition.Y)
 		end)
 
-		-- Config arrow và frame
+		-- Config
 		local configFrame
 		local arrowOpen = false
 		
@@ -961,7 +941,6 @@ function Library:CreateTab(name, icon)
 			padding(configFrame, 10)
 
 			-- Build sub-configs
-			local subControls = {}
 			for _, c in ipairs(opts.Config or {}) do
 				local sub = create("Frame", {
 					Size = UDim2.new(1, 0, 0, 34),
@@ -1015,11 +994,14 @@ function Library:CreateTab(name, icon)
 						if c.Callback then task.spawn(c.Callback, subState) end
 					end)
 					
-					table.insert(subControls, { Type = "Toggle", Set = function(v) 
-						subState = v
-						tween(subSwitchBg, EASE_FAST, { BackgroundColor3 = subState and Theme.Accent or Theme.CardBorder })
-						tween(subKnob, EASE_FAST, { Position = subState and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0) })
-					end })
+					table.insert(subControls, { 
+						Type = "Toggle", 
+						Set = function(v) 
+							subState = v
+							tween(subSwitchBg, EASE_FAST, { BackgroundColor3 = subState and Theme.Accent or Theme.CardBorder })
+							tween(subKnob, EASE_FAST, { Position = subState and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0) })
+						end 
+					})
 
 				elseif c.Type == "Slider" then
 					local min, max = c.Min or 0, c.Max or 100
@@ -1057,10 +1039,13 @@ function Library:CreateTab(name, icon)
 						end
 					end)
 					
-					table.insert(subControls, { Type = "Slider", Set = function(v) 
-						val = math.clamp(v, min, max)
-						fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
-					end })
+					table.insert(subControls, { 
+						Type = "Slider", 
+						Set = function(v) 
+							val = math.clamp(v, min, max)
+							fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
+						end 
+					})
 
 				elseif c.Type == "Textbox" then
 					local tb = create("TextBox", {
@@ -1081,14 +1066,21 @@ function Library:CreateTab(name, icon)
 					padding(tb, 6)
 					
 					tb.Focused:Connect(function()
-						tween(tb.UIStroke, EASE_FAST, { Color = Theme.Accent, Transparency = 0 })
+						if tb.UIStroke then
+							tween(tb.UIStroke, EASE_FAST, { Color = Theme.Accent, Transparency = 0 })
+						end
 					end)
 					tb.FocusLost:Connect(function()
-						tween(tb.UIStroke, EASE_FAST, { Color = Theme.CardBorder, Transparency = 0.2 })
+						if tb.UIStroke then
+							tween(tb.UIStroke, EASE_FAST, { Color = Theme.CardBorder, Transparency = 0.2 })
+						end
 						if c.Callback then task.spawn(c.Callback, tb.Text) end
 					end)
 					
-					table.insert(subControls, { Type = "Textbox", Set = function(v) tb.Text = v end })
+					table.insert(subControls, { 
+						Type = "Textbox", 
+						Set = function(v) tb.Text = v end 
+					})
 				end
 			end
 
@@ -1126,7 +1118,7 @@ function Library:CreateTab(name, icon)
 	end
 
 	----------------------------------------------------------------
-	-- DROPDOWN (Nâng cấp)
+	-- DROPDOWN
 	----------------------------------------------------------------
 	function Tab:CreateDropdown(opts)
 		opts = opts or {}
@@ -1219,7 +1211,9 @@ function Library:CreateTab(name, icon)
 		local optionButtons = {}
 		local function buildOptions(newList)
 			if newList then currentList = newList end
-			for _, b in ipairs(optionButtons) do b:Destroy() end
+			for _, b in ipairs(optionButtons) do 
+				if b and b.Parent then b:Destroy() end 
+			end
 			optionButtons = {}
 			
 			for _, item in ipairs(currentList) do
@@ -1332,7 +1326,7 @@ function Library:CreateTab(name, icon)
 	end
 
 	----------------------------------------------------------------
-	-- SLIDER (Nâng cấp)
+	-- SLIDER
 	----------------------------------------------------------------
 	function Tab:CreateSlider(opts)
 		opts = opts or {}
@@ -1377,7 +1371,6 @@ function Library:CreateTab(name, icon)
 		})
 		corner(track, 4)
 		
-		-- Track glow
 		local trackGlow = create("Frame", {
 			Size = UDim2.fromScale(1, 1),
 			BackgroundColor3 = Theme.Accent,
@@ -1394,8 +1387,7 @@ function Library:CreateTab(name, icon)
 		})
 		corner(fill, 4)
 		
-		-- Fill gradient
-		local fillGradient = create("UIGradient", {
+		create("UIGradient", {
 			Color = ColorSequence.new({
 				ColorSequenceKeypoint.new(0, Theme.AccentGradient1),
 				ColorSequenceKeypoint.new(1, Theme.AccentGradient2),
@@ -1415,7 +1407,6 @@ function Library:CreateTab(name, icon)
 		corner(knob, 10)
 		stroke(knob, Theme.Accent, 2)
 		
-		-- Knob glow
 		local knobGlow = create("Frame", {
 			Size = UDim2.fromScale(1.5, 1.5),
 			Position = UDim2.fromScale(-0.25, -0.25),
@@ -1473,7 +1464,7 @@ function Library:CreateTab(name, icon)
 	end
 
 	----------------------------------------------------------------
-	-- TEXTBOX (Nâng cấp)
+	-- TEXTBOX
 	----------------------------------------------------------------
 	function Tab:CreateTextbox(opts)
 		opts = opts or {}
@@ -1515,11 +1506,15 @@ function Library:CreateTab(name, icon)
 		padding(box, 10)
 
 		box.Focused:Connect(function()
-			tween(box.UIStroke, EASE_FAST, { Color = Theme.Accent, Transparency = 0 })
+			if box.UIStroke then
+				tween(box.UIStroke, EASE_FAST, { Color = Theme.Accent, Transparency = 0 })
+			end
 			tween(box, EASE_FAST, { BackgroundTransparency = 0.2 })
 		end)
 		box.FocusLost:Connect(function(enter)
-			tween(box.UIStroke, EASE_FAST, { Color = Theme.CardBorder, Transparency = 0.2 })
+			if box.UIStroke then
+				tween(box.UIStroke, EASE_FAST, { Color = Theme.CardBorder, Transparency = 0.2 })
+			end
 			tween(box, EASE_FAST, { BackgroundTransparency = 0.5 })
 			task.spawn(callback, box.Text, enter)
 		end)
@@ -1533,7 +1528,7 @@ function Library:CreateTab(name, icon)
 	end
 
 	----------------------------------------------------------------
-	-- BUTTON (Nâng cấp)
+	-- BUTTON
 	----------------------------------------------------------------
 	function Tab:CreateButton(opts)
 		opts = opts or {}
@@ -1582,7 +1577,6 @@ function Library:CreateTab(name, icon)
 		})
 		corner(btn, 10)
 		
-		-- Button shine
 		shineEffect(btn)
 
 		btn.MouseEnter:Connect(function()
