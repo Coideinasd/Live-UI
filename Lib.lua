@@ -1,7 +1,7 @@
 --[[
-	FluentLib - Windows 11 Inspired CoreGui Library (Dropdown mới)
+	FluentLib - Windows 11 Inspired CoreGui Library (Full Fixed)
 	Tác giả: Claude
-	Version: 2.3 - Dropdown mới với overlay
+	Version: 2.4 - Fixed all bugs + Resize
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -160,16 +160,6 @@ local function ripple(button, x, y, color)
 	end)
 end
 
-local function hoverFeedback(obj, baseColor, hoverColor)
-	if not obj then return end
-	obj.MouseEnter:Connect(function()
-		tween(obj, EASE_FAST, { BackgroundColor3 = hoverColor })
-	end)
-	obj.MouseLeave:Connect(function()
-		tween(obj, EASE_FAST, { BackgroundColor3 = baseColor })
-	end)
-end
-
 -- Tạo overlay
 local function createOverlay(parent)
 	local overlay = create("Frame", {
@@ -183,6 +173,41 @@ local function createOverlay(parent)
 	})
 	corner(overlay, 12)
 	return overlay
+end
+
+-- Resize handle
+local function createResizeHandle(parent)
+	local handle = create("Frame", {
+		Name = "ResizeHandle",
+		Size = UDim2.new(0, 16, 0, 16),
+		Position = UDim2.new(1, -16, 1, -16),
+		AnchorPoint = Vector2.new(1, 1),
+		BackgroundColor3 = Theme.Accent,
+		BackgroundTransparency = 0.8,
+		ZIndex = 10,
+		Parent = parent,
+	})
+	corner(handle, 4)
+	
+	-- Icon resize
+	local icon = create("ImageLabel", {
+		Image = Icons["lucide-maximize"],
+		ImageColor3 = Theme.TextSecondary,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, 12, 0, 12),
+		Position = UDim2.fromScale(0.5, 0.5),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Parent = handle,
+	})
+	
+	handle.MouseEnter:Connect(function()
+		tween(handle, EASE_FAST, { BackgroundTransparency = 0.4 })
+	end)
+	handle.MouseLeave:Connect(function()
+		tween(handle, EASE_FAST, { BackgroundTransparency = 0.8 })
+	end)
+	
+	return handle
 end
 
 ----------------------------------------------------------------
@@ -212,6 +237,9 @@ function Library.new(title)
 	self.Tabs = {}
 	self.ActiveTab = nil
 	self.Dropdowns = {}
+	self.IsMaximized = false
+	self.WindowSize = {Width = 720, Height = 520}
+	self.WindowPos = nil
 
 	-- MAIN WINDOW
 	local main = create("Frame", {
@@ -240,6 +268,41 @@ function Library.new(title)
 	
 	self.Main = main
 	self.MainOverlay = createOverlay(main)
+	
+	-- Resize handle
+	self.ResizeHandle = createResizeHandle(main)
+	
+	-- Resize logic
+	do
+		local resizing, startPos, startSize
+		local handle = self.ResizeHandle
+		
+		handle.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				resizing = true
+				startPos = input.Position
+				startSize = main.Size
+				tween(main, EASE_FAST, { BackgroundTransparency = 0.05 })
+			end
+		end)
+		
+		handle.InputEnded:Connect(function()
+			if resizing then
+				resizing = false
+				tween(main, EASE_FAST, { BackgroundTransparency = 0 })
+				self.WindowSize = {Width = main.Size.X.Offset, Height = main.Size.Y.Offset}
+			end
+		end)
+		
+		UserInputService.InputChanged:Connect(function(input)
+			if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+				local delta = input.Position - startPos
+				local newWidth = math.max(400, startSize.X.Offset + delta.X)
+				local newHeight = math.max(300, startSize.Y.Offset + delta.Y)
+				main.Size = UDim2.fromOffset(newWidth, newHeight)
+			end
+		end)
+	end
 
 	-- TITLEBAR
 	local titleBar = create("Frame", {
@@ -274,8 +337,8 @@ function Library.new(title)
 	-- Window Controls
 	local controls = create("Frame", {
 		Name = "Controls",
-		Size = UDim2.new(0, 130, 1, 0),
-		Position = UDim2.new(1, -140, 0, 0),
+		Size = UDim2.new(0, 140, 1, 0),
+		Position = UDim2.new(1, -150, 0, 0),
 		BackgroundTransparency = 1,
 		Parent = titleBar,
 	})
@@ -309,14 +372,45 @@ function Library.new(title)
 		return btn
 	end
 	
+	-- Minimize
 	createControlBtn(Icons["lucide-minus"], nil, function()
-		tween(main, EASE, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
+		tween(main, EASE, { Size = UDim2.fromOffset(main.Size.X.Offset, 0), BackgroundTransparency = 1 })
 		task.wait(0.3)
 		self.Main.Visible = false
 	end)
 	
-	createControlBtn(Icons["lucide-maximize"], nil, function() end)
+	-- Maximize/Restore
+	local maximizeBtn = createControlBtn(Icons["lucide-maximize"], nil, function()
+		if self.IsMaximized then
+			-- Restore
+			self.IsMaximized = false
+			tween(main, EASE_SPRING, { 
+				Size = UDim2.fromOffset(self.WindowSize.Width, self.WindowSize.Height),
+				Position = self.WindowPos or UDim2.fromScale(0.5, 0.5),
+			})
+			tween(maximizeBtn, EASE_FAST, { Image = Icons["lucide-maximize"] })
+			corner(main, 16)
+		else
+			-- Maximize
+			self.IsMaximized = true
+			self.WindowPos = main.Position
+			self.WindowSize = {Width = main.Size.X.Offset, Height = main.Size.Y.Offset}
+			
+			-- Lấy kích thước màn hình
+			local screenSize = game:GetService("GuiService"):GetScreenResolution()
+			local screenWidth = screenSize.X
+			local screenHeight = screenSize.Y
+			
+			tween(main, EASE_SPRING, { 
+				Size = UDim2.fromOffset(screenWidth - 40, screenHeight - 40),
+				Position = UDim2.fromOffset(20, 20),
+			})
+			tween(maximizeBtn, EASE_FAST, { Image = Icons["lucide-minimize-2"] })
+			corner(main, 0)
+		end
+	end)
 	
+	-- Close
 	createControlBtn(Icons["lucide-x"], Theme.Danger, function()
 		tween(main, EASE_SPRING, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
 		task.wait(0.35)
@@ -326,22 +420,42 @@ function Library.new(title)
 	-- DRAG
 	do
 		local dragging, dragStart, startPos
+		local isOverControl = false
+		
 		titleBar.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				dragging = true
-				dragStart = input.Position
-				startPos = main.Position
-				tween(main, EASE_FAST, { BackgroundTransparency = 0.05 })
+				-- Check if clicking on controls
+				local mousePos = input.Position
+				local controlFrame = controls
+				if controlFrame and controlFrame.AbsoluteSize then
+					local absPos = controlFrame.AbsolutePosition
+					local absSize = controlFrame.AbsoluteSize
+					if mousePos.X >= absPos.X and mousePos.X <= absPos.X + absSize.X and
+					   mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y + absSize.Y then
+						isOverControl = true
+						return
+					end
+				end
+				
+				if not self.IsMaximized then
+					dragging = true
+					dragStart = input.Position
+					startPos = main.Position
+					tween(main, EASE_FAST, { BackgroundTransparency = 0.05 })
+				end
 			end
 		end)
 		titleBar.InputEnded:Connect(function()
 			if dragging then
 				dragging = false
 				tween(main, EASE_FAST, { BackgroundTransparency = 0 })
+				self.WindowPos = main.Position
 			end
+			isOverControl = false
 		end)
 		UserInputService.InputChanged:Connect(function(input)
-			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			if dragging and not isOverControl and 
+			   (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 				local delta = input.Position - dragStart
 				main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			end
@@ -418,16 +532,17 @@ function Library.new(title)
 	main.Size = UDim2.fromOffset(720, 0)
 	tween(main, EASE_SPRING, { Size = UDim2.fromOffset(720, 520), BackgroundTransparency = 0 })
 
+	-- Toggle UI with key
 	UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
 		if input.KeyCode == Enum.KeyCode.RightShift then
 			if self.Main.Visible then
-				tween(main, EASE, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
+				tween(main, EASE, { Size = UDim2.fromOffset(main.Size.X.Offset, 0), BackgroundTransparency = 1 })
 				task.wait(0.3)
 				self.Main.Visible = false
 			else
 				self.Main.Visible = true
-				tween(main, EASE_SPRING, { Size = UDim2.fromOffset(720, 520), BackgroundTransparency = 0 })
+				tween(main, EASE_SPRING, { Size = UDim2.fromOffset(self.WindowSize.Width or 720, self.WindowSize.Height or 520), BackgroundTransparency = 0 })
 			end
 		end
 	end)
@@ -489,7 +604,9 @@ end
 
 function DropdownList:BuildOptions()
 	for _, btn in ipairs(self.OptionButtons) do
-		if btn and btn.Parent then btn:Destroy() end
+		if btn and btn.Parent then 
+			pcall(function() btn:Destroy() end)
+		end
 	end
 	self.OptionButtons = {}
 	
@@ -577,6 +694,13 @@ end
 function DropdownList:Show()
 	if #self.Options == 0 then return end
 	
+	-- Đóng các dropdown khác
+	for _, d in ipairs(self.Parent:FindFirstChildOfClass("ScreenGui"):FindFirstChild("Main"):FindFirstChild("Dropdowns") or {}) do
+		if d ~= self and d.Visible then
+			d:Hide()
+		end
+	end
+	
 	self.Visible = true
 	self.Frame.Visible = true
 	self.Overlay.Visible = true
@@ -601,9 +725,10 @@ function DropdownList:Show()
 	})
 	
 	-- Click outside để đóng
-	self.Overlay.MouseButton1Click:Connect(function()
+	local function closeOnClick()
 		self:Hide()
-	end)
+	end
+	self.Overlay.MouseButton1Click:Connect(closeOnClick)
 end
 
 function DropdownList:Hide()
@@ -618,8 +743,8 @@ function DropdownList:Hide()
 	tween(self.Overlay, EASE, { BackgroundTransparency = 0.6 })
 	
 	task.delay(0.35, function()
-		self.Frame.Visible = false
-		self.Overlay.Visible = false
+		if self.Frame then self.Frame.Visible = false end
+		if self.Overlay then self.Overlay.Visible = false end
 	end)
 end
 
@@ -637,7 +762,7 @@ function DropdownList:SetSelected(value)
 		end
 	else
 		for k in pairs(self.Selected) do self.Selected[k] = false end
-		self.Selected[value] = true
+		if value then self.Selected[value] = true end
 	end
 	self:BuildOptions()
 end
@@ -1355,9 +1480,11 @@ function Library:CreateTab(name, icon)
 				-- Update label
 				local names = {}
 				if multi then
-					for _, v in ipairs(value) do table.insert(names, tostring(v)) end
+					if typeof(value) == "table" then
+						for _, v in ipairs(value) do table.insert(names, tostring(v)) end
+					end
 				else
-					names = {tostring(value)}
+					if value then names = {tostring(value)} end
 				end
 				selectedLabel.Text = (#names == 0) and "Chọn..." or table.concat(names, ", ")
 			end
@@ -1404,7 +1531,7 @@ function Library:CreateTab(name, icon)
 						for _, v in ipairs(value) do table.insert(names, tostring(v)) end
 					end
 				else
-					names = {tostring(value)}
+					if value then names = {tostring(value)} end
 				end
 				selectedLabel.Text = (#names == 0) and "Chọn..." or table.concat(names, ", ")
 			end,
@@ -1633,78 +1760,78 @@ function Library:CreateTab(name, icon)
 		
 		if opts.Description then
 			create("TextLabel", {
-				Text = opts.Description,
-				Font = Theme.FontLight,
-				TextSize = 12,
-				TextColor3 = Theme.TextMuted,
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(16, 6),
-				Size = UDim2.new(1, -20, 0, 18),
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Parent = card,
-			})
-		end
-		
-		local btnColors = {
-			primary = { bg = Theme.Accent, hover = Theme.AccentLight, text = Theme.TextPrimary },
-			success = { bg = Theme.Success, hover = Theme.Success, text = Theme.TextPrimary },
-			danger = { bg = Theme.Danger, hover = Theme.Danger, text = Theme.TextPrimary },
-			secondary = { bg = Theme.CardHover, hover = Theme.CardActive, text = Theme.TextPrimary },
-		}
-		
-		local colors = btnColors[variant] or btnColors.primary
-		
-		local btn = create("TextButton", {
-			Text = name,
-			AutoButtonColor = false,
-			Font = Theme.FontBold, 
-			TextSize = 14, 
-			TextColor3 = colors.text,
-			BackgroundColor3 = colors.bg,
-			BackgroundTransparency = 0.9,
-			Size = UDim2.new(1, -16, 0, 36),
-			Position = opts.Description and UDim2.fromOffset(8, 30) or UDim2.fromOffset(8, 7),
-			ClipsDescendants = true,
-			Parent = card,
-		})
-		corner(btn, 10)
-
-		btn.MouseEnter:Connect(function()
-			tween(btn, EASE_FAST, { 
-				BackgroundColor3 = colors.hover,
-				BackgroundTransparency = 0.7,
-			})
-		end)
-		btn.MouseLeave:Connect(function()
-			tween(btn, EASE_FAST, { 
+					Text = opts.Description,
+					Font = Theme.FontLight,
+					TextSize = 12,
+					TextColor3 = Theme.TextMuted,
+					BackgroundTransparency = 1,
+					Position = UDim2.fromOffset(16, 6),
+					Size = UDim2.new(1, -20, 0, 18),
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Parent = card,
+				})
+			end
+			
+			local btnColors = {
+				primary = { bg = Theme.Accent, hover = Theme.AccentLight, text = Theme.TextPrimary },
+				success = { bg = Theme.Success, hover = Theme.Success, text = Theme.TextPrimary },
+				danger = { bg = Theme.Danger, hover = Theme.Danger, text = Theme.TextPrimary },
+				secondary = { bg = Theme.CardHover, hover = Theme.CardActive, text = Theme.TextPrimary },
+			}
+			
+			local colors = btnColors[variant] or btnColors.primary
+			
+			local btn = create("TextButton", {
+				Text = name,
+				AutoButtonColor = false,
+				Font = Theme.FontBold, 
+				TextSize = 14, 
+				TextColor3 = colors.text,
 				BackgroundColor3 = colors.bg,
 				BackgroundTransparency = 0.9,
-			})
-		end)
-		btn.MouseButton1Down:Connect(function()
-			tween(btn, EASE_FAST, { 
-				Size = UDim2.new(1, -20, 0, 32), 
-				Position = opts.Description and UDim2.fromOffset(10, 32) or UDim2.fromOffset(10, 9),
-				BackgroundTransparency = 0.6,
-			})
-		end)
-		btn.MouseButton1Up:Connect(function()
-			tween(btn, EASE_SPRING, { 
-				Size = UDim2.new(1, -16, 0, 36), 
+				Size = UDim2.new(1, -16, 0, 36),
 				Position = opts.Description and UDim2.fromOffset(8, 30) or UDim2.fromOffset(8, 7),
-				BackgroundTransparency = 0.9,
+				ClipsDescendants = true,
+				Parent = card,
 			})
-		end)
-		btn.MouseButton1Click:Connect(function()
-			ripple(btn, Mouse.X - btn.AbsolutePosition.X, Mouse.Y - btn.AbsolutePosition.Y, colors.text)
-			task.spawn(callback)
-		end)
+			corner(btn, 10)
 
-		table.insert(self.Elements, { Frame = card, SearchText = name .. " " .. (opts.Description or ""), Type = "Button" })
-		return { 
-			SetText = function(_, v) btn.Text = v end,
-		}
-	end
+			btn.MouseEnter:Connect(function()
+				tween(btn, EASE_FAST, { 
+					BackgroundColor3 = colors.hover,
+					BackgroundTransparency = 0.7,
+				})
+			end)
+			btn.MouseLeave:Connect(function()
+				tween(btn, EASE_FAST, { 
+					BackgroundColor3 = colors.bg,
+					BackgroundTransparency = 0.9,
+				})
+			end)
+			btn.MouseButton1Down:Connect(function()
+				tween(btn, EASE_FAST, { 
+					Size = UDim2.new(1, -20, 0, 32), 
+					Position = opts.Description and UDim2.fromOffset(10, 32) or UDim2.fromOffset(10, 9),
+					BackgroundTransparency = 0.6,
+				})
+			end)
+			btn.MouseButton1Up:Connect(function()
+				tween(btn, EASE_SPRING, { 
+					Size = UDim2.new(1, -16, 0, 36), 
+					Position = opts.Description and UDim2.fromOffset(8, 30) or UDim2.fromOffset(8, 7),
+					BackgroundTransparency = 0.9,
+				})
+			end)
+			btn.MouseButton1Click:Connect(function()
+				ripple(btn, Mouse.X - btn.AbsolutePosition.X, Mouse.Y - btn.AbsolutePosition.Y, colors.text)
+				task.spawn(callback)
+			end)
+
+			table.insert(self.Elements, { Frame = card, SearchText = name .. " " .. (opts.Description or ""), Type = "Button" })
+			return { 
+				SetText = function(_, v) btn.Text = v end,
+			}
+		end
 
 	return Tab
 end
