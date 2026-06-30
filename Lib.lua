@@ -1,7 +1,7 @@
 --[[
-	FluentLib - Windows 11 Inspired CoreGui Library (Fixed)
+	FluentLib - Windows 11 Inspired CoreGui Library (Dropdown mới)
 	Tác giả: Claude
-	Version: 2.2 - Fixed Icons & UI
+	Version: 2.3 - Dropdown mới với overlay
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -72,6 +72,7 @@ end
 local EASE = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local EASE_FAST = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local EASE_SPRING = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local EASE_BOUNCE = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 local function corner(parent, radius)
 	if not parent then return end
@@ -169,6 +170,21 @@ local function hoverFeedback(obj, baseColor, hoverColor)
 	end)
 end
 
+-- Tạo overlay
+local function createOverlay(parent)
+	local overlay = create("Frame", {
+		Name = "DropdownOverlay",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.6,
+		Visible = false,
+		ZIndex = 100,
+		Parent = parent,
+	})
+	corner(overlay, 12)
+	return overlay
+end
+
 ----------------------------------------------------------------
 -- LIBRARY ROOT
 ----------------------------------------------------------------
@@ -195,6 +211,7 @@ function Library.new(title)
 	self.Gui = gui
 	self.Tabs = {}
 	self.ActiveTab = nil
+	self.Dropdowns = {}
 
 	-- MAIN WINDOW
 	local main = create("Frame", {
@@ -222,6 +239,7 @@ function Library.new(title)
 	gradientBorder(main, Theme.AccentGradient1, Theme.AccentGradient2)
 	
 	self.Main = main
+	self.MainOverlay = createOverlay(main)
 
 	-- TITLEBAR
 	local titleBar = create("Frame", {
@@ -231,7 +249,6 @@ function Library.new(title)
 		Parent = main,
 	})
 	
-	-- Icon
 	local titleIcon = create("ImageLabel", {
 		Image = Icons["lucide-activity"],
 		ImageColor3 = Theme.Accent,
@@ -254,7 +271,7 @@ function Library.new(title)
 		Parent = titleBar,
 	})
 
-	-- Window Controls với icons từ Live-UI
+	-- Window Controls
 	local controls = create("Frame", {
 		Name = "Controls",
 		Size = UDim2.new(0, 130, 1, 0),
@@ -292,17 +309,14 @@ function Library.new(title)
 		return btn
 	end
 	
-	-- Minimize
 	createControlBtn(Icons["lucide-minus"], nil, function()
 		tween(main, EASE, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
 		task.wait(0.3)
 		self.Main.Visible = false
 	end)
 	
-	-- Maximize
 	createControlBtn(Icons["lucide-maximize"], nil, function() end)
 	
-	-- Close
 	createControlBtn(Icons["lucide-x"], Theme.Danger, function()
 		tween(main, EASE_SPRING, { Size = UDim2.fromOffset(720, 0), BackgroundTransparency = 1 })
 		task.wait(0.35)
@@ -404,7 +418,6 @@ function Library.new(title)
 	main.Size = UDim2.fromOffset(720, 0)
 	tween(main, EASE_SPRING, { Size = UDim2.fromOffset(720, 520), BackgroundTransparency = 0 })
 
-	-- Toggle UI with key
 	UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe then return end
 		if input.KeyCode == Enum.KeyCode.RightShift then
@@ -420,6 +433,224 @@ function Library.new(title)
 	end)
 
 	return self
+end
+
+----------------------------------------------------------------
+-- DROPDOWN LIST (Component riêng)
+----------------------------------------------------------------
+local DropdownList = {}
+DropdownList.__index = DropdownList
+
+function DropdownList.new(parent, options, selected, multi, callback)
+	local self = setmetatable({}, DropdownList)
+	
+	self.Parent = parent
+	self.Options = options or {}
+	self.Selected = selected or {}
+	self.Multi = multi or false
+	self.Callback = callback or function() end
+	self.Visible = false
+	
+	-- Overlay
+	self.Overlay = parent:FindFirstChild("DropdownOverlay")
+	if not self.Overlay then
+		self.Overlay = createOverlay(parent)
+	end
+	
+	-- List Frame
+	self.Frame = create("Frame", {
+		Name = "DropdownList",
+		Size = UDim2.fromOffset(0, 0),
+		Position = UDim2.fromScale(1, 0),
+		AnchorPoint = Vector2.new(1, 0),
+		BackgroundColor3 = Theme.Card,
+		BackgroundTransparency = 0.05,
+		ClipsDescendants = true,
+		Visible = false,
+		ZIndex = 101,
+		Parent = parent,
+	})
+	corner(self.Frame, 12)
+	stroke(self.Frame, Theme.Accent, 1, 0.3)
+	
+	-- List content
+	local listLayout = create("UIListLayout", {
+		Padding = UDim.new(0, 4),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = self.Frame,
+	})
+	padding(self.Frame, 8)
+	
+	self.OptionButtons = {}
+	self:BuildOptions()
+	
+	return self
+end
+
+function DropdownList:BuildOptions()
+	for _, btn in ipairs(self.OptionButtons) do
+		if btn and btn.Parent then btn:Destroy() end
+	end
+	self.OptionButtons = {}
+	
+	for _, item in ipairs(self.Options) do
+		local isSelected = self.Selected[item] or false
+		
+		local optBtn = create("TextButton", {
+			Text = "",
+			AutoButtonColor = false,
+			Size = UDim2.new(1, 0, 0, 36),
+			BackgroundColor3 = Theme.Card,
+			BackgroundTransparency = isSelected and 0.3 or 1,
+			ZIndex = 102,
+			Parent = self.Frame,
+		})
+		corner(optBtn, 8)
+		
+		optBtn.MouseEnter:Connect(function()
+			tween(optBtn, EASE_FAST, { BackgroundTransparency = isSelected and 0.3 or 0.7 })
+		end)
+		optBtn.MouseLeave:Connect(function()
+			tween(optBtn, EASE_FAST, { BackgroundTransparency = isSelected and 0.3 or 1 })
+		end)
+		
+		-- Check icon
+		local checkIcon = create("ImageLabel", {
+			Image = Icons["lucide-check"],
+			ImageColor3 = Theme.Accent,
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(10, 18),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Size = UDim2.new(0, 16, 0, 16),
+			Visible = isSelected,
+			ZIndex = 103,
+			Parent = optBtn,
+		})
+		
+		create("TextLabel", {
+			Text = tostring(item),
+			Font = Theme.Font,
+			TextSize = 13,
+			TextColor3 = isSelected and Theme.AccentLight or Theme.TextSecondary,
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(36, 0),
+			Size = UDim2.new(1, -46, 1, 0),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 102,
+			Parent = optBtn,
+		})
+		
+		optBtn.MouseButton1Click:Connect(function()
+			if self.Multi then
+				self.Selected[item] = not self.Selected[item]
+			else
+				for k in pairs(self.Selected) do self.Selected[k] = false end
+				self.Selected[item] = true
+			end
+			
+			self:BuildOptions()
+			self:UpdateSelection()
+			
+			local result
+			if self.Multi then
+				result = {}
+				for k, v in pairs(self.Selected) do if v then table.insert(result, k) end end
+			else
+				for k, v in pairs(self.Selected) do if v then result = k break end end
+			end
+			task.spawn(self.Callback, result)
+			self:Hide()
+		end)
+		
+		table.insert(self.OptionButtons, optBtn)
+	end
+end
+
+function DropdownList:UpdateSelection()
+	local names = {}
+	for k, v in pairs(self.Selected) do
+		if v then table.insert(names, tostring(k)) end
+	end
+	return #names == 0 and "Chọn..." or table.concat(names, ", ")
+end
+
+function DropdownList:Show()
+	if #self.Options == 0 then return end
+	
+	self.Visible = true
+	self.Frame.Visible = true
+	self.Overlay.Visible = true
+	
+	-- Tính toán kích thước
+	local itemHeight = 36
+	local padding = 16
+	local maxHeight = math.min(#self.Options * itemHeight + padding, 250)
+	local width = 220
+	
+	-- Animation mở từ bên phải
+	self.Frame.Size = UDim2.fromOffset(0, maxHeight)
+	self.Frame.Position = UDim2.fromScale(1.05, 0)
+	
+	-- Overlay fade in
+	tween(self.Overlay, EASE, { BackgroundTransparency = 0.5 })
+	
+	-- List slide in
+	tween(self.Frame, EASE_BOUNCE, {
+		Size = UDim2.fromOffset(width, maxHeight),
+		Position = UDim2.fromScale(1, 0)
+	})
+	
+	-- Click outside để đóng
+	self.Overlay.MouseButton1Click:Connect(function()
+		self:Hide()
+	end)
+end
+
+function DropdownList:Hide()
+	if not self.Visible then return end
+	self.Visible = false
+	
+	tween(self.Frame, EASE, {
+		Size = UDim2.fromOffset(0, 0),
+		Position = UDim2.fromScale(1.05, 0)
+	})
+	
+	tween(self.Overlay, EASE, { BackgroundTransparency = 0.6 })
+	
+	task.delay(0.35, function()
+		self.Frame.Visible = false
+		self.Overlay.Visible = false
+	end)
+end
+
+function DropdownList:SetOptions(newOptions)
+	self.Options = newOptions or {}
+	self.Selected = {}
+	self:BuildOptions()
+end
+
+function DropdownList:SetSelected(value)
+	if self.Multi then
+		self.Selected = {}
+		if typeof(value) == "table" then
+			for _, v in ipairs(value) do self.Selected[v] = true end
+		end
+	else
+		for k in pairs(self.Selected) do self.Selected[k] = false end
+		self.Selected[value] = true
+	end
+	self:BuildOptions()
+end
+
+function DropdownList:GetSelected()
+	if self.Multi then
+		local result = {}
+		for k, v in pairs(self.Selected) do if v then table.insert(result, k) end end
+		return result
+	else
+		for k, v in pairs(self.Selected) do if v then return k end end
+		return nil
+	end
 end
 
 ----------------------------------------------------------------
@@ -494,13 +725,13 @@ function Library:CreateTab(name, icon)
 	corner(searchContainer, 12)
 	gradientBorder(searchContainer, Theme.AccentGradient1, Theme.AccentGradient2)
 	
-	-- Search icon
 	local searchIcon = create("ImageLabel", {
 		Image = Icons["lucide-search"],
 		ImageColor3 = Theme.TextMuted,
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(12, 0),
-		Size = UDim2.new(0, 20, 1, 0),
+		Position = UDim2.fromOffset(12, 22),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Size = UDim2.new(0, 18, 0, 18),
 		Parent = searchContainer,
 	})
 	
@@ -513,29 +744,27 @@ function Library:CreateTab(name, icon)
 		TextColor3 = Theme.TextPrimary,
 		PlaceholderColor3 = Theme.TextMuted,
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, -40, 1, 0),
+		Size = UDim2.new(1, -44, 1, 0),
 		Position = UDim2.fromOffset(40, 0),
 		ClearTextOnFocus = false,
 		Parent = searchContainer,
 	})
 
-	local clearBtn = create("TextButton", {
-		Text = "✕",
-		Font = Theme.Font,
-		TextSize = 12,
-		TextColor3 = Theme.TextMuted,
+	local clearBtn = create("ImageButton", {
+		Image = Icons["lucide-x"],
+		ImageColor3 = Theme.TextMuted,
 		BackgroundTransparency = 1,
-		Size = UDim2.fromOffset(24, 24),
-		Position = UDim2.new(1, -30, 0.5, 0),
+		Size = UDim2.fromOffset(20, 20),
+		Position = UDim2.new(1, -28, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		Visible = false,
 		Parent = searchContainer,
 	})
 	clearBtn.MouseEnter:Connect(function()
-		tween(clearBtn, EASE_FAST, { TextColor3 = Theme.TextPrimary })
+		tween(clearBtn, EASE_FAST, { ImageColor3 = Theme.TextPrimary })
 	end)
 	clearBtn.MouseLeave:Connect(function()
-		tween(clearBtn, EASE_FAST, { TextColor3 = Theme.TextMuted })
+		tween(clearBtn, EASE_FAST, { ImageColor3 = Theme.TextMuted })
 	end)
 	clearBtn.MouseButton1Click:Connect(function()
 		searchBox.Text = ""
@@ -697,8 +926,8 @@ function Library:CreateTab(name, icon)
 				highlightFrame.Position = UDim2.fromOffset(16 + beforeWidth, 36)
 				highlightFrame.Size = UDim2.new(0, textBounds.X * (#highlight / #desc) + 8, 0, 22)
 				
-				tween(highlightFrame, EASE_SLOW or EASE, { BackgroundTransparency = 0.7 })
-				tween(highlightFrame, EASE_SLOW or EASE, { BackgroundTransparency = 0.85 })
+				tween(highlightFrame, EASE, { BackgroundTransparency = 0.7 })
+				tween(highlightFrame, EASE, { BackgroundTransparency = 0.85 })
 			end)
 		end
 
@@ -1040,7 +1269,7 @@ function Library:CreateTab(name, icon)
 	end
 
 	----------------------------------------------------------------
-	-- DROPDOWN
+	-- DROPDOWN (Mới - với overlay)
 	----------------------------------------------------------------
 	function Tab:CreateDropdown(opts)
 		opts = opts or {}
@@ -1048,9 +1277,8 @@ function Library:CreateTab(name, icon)
 		local list = opts.List_Table or opts.List or {}
 		local multi = opts.Multi or false
 		local callback = opts.Callback or function() end
+		
 		local selected = {}
-		local currentList = list
-
 		if opts.Default then
 			if multi and typeof(opts.Default) == "table" then
 				for _, v in ipairs(opts.Default) do selected[v] = true end
@@ -1060,6 +1288,8 @@ function Library:CreateTab(name, icon)
 		end
 
 		local card = newCard(50, true)
+		
+		-- Header
 		local header = create("TextButton", {
 			Text = "",
 			AutoButtonColor = false,
@@ -1068,178 +1298,122 @@ function Library:CreateTab(name, icon)
 			Parent = card,
 		})
 		
+		-- Icon
+		local iconLabel = create("ImageLabel", {
+			Image = Icons["lucide-list"],
+			ImageColor3 = Theme.TextMuted,
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(16, 25),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Size = UDim2.new(0, 18, 0, 18),
+			Parent = header,
+		})
+		
 		create("TextLabel", {
-			Text = "📋 " .. name,
-			Font = Theme.Font, 
-			TextSize = 14, 
+			Text = name,
+			Font = Theme.Font,
+			TextSize = 14,
 			TextColor3 = Theme.TextPrimary,
 			BackgroundTransparency = 1,
-			Position = UDim2.fromOffset(16, 0),
-			Size = UDim2.new(1, -170, 1, 0),
+			Position = UDim2.fromOffset(44, 0),
+			Size = UDim2.new(1, -180, 1, 0),
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Parent = header,
 		})
 		
 		local selectedLabel = create("TextLabel", {
 			Text = "Chọn...",
-			Font = Theme.Font, 
-			TextSize = 13, 
+			Font = Theme.Font,
+			TextSize = 13,
 			TextColor3 = Theme.TextSecondary,
 			BackgroundTransparency = 1,
-			Position = UDim2.new(1, -160, 0, 0),
-			Size = UDim2.new(0, 120, 1, 0),
+			Position = UDim2.new(1, -170, 0, 0),
+			Size = UDim2.new(0, 130, 1, 0),
 			TextXAlignment = Enum.TextXAlignment.Right,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			Parent = header,
 		})
 		
-		local arrow = create("ImageLabel", {
-			Image = Icons["lucide-chevron-down"],
-			ImageColor3 = Theme.TextSecondary,
+		local arrowIcon = create("ImageLabel", {
+			Image = Icons["lucide-chevron-right"],
+			ImageColor3 = Theme.TextMuted,
 			BackgroundTransparency = 1,
-			Position = UDim2.new(1, -32, 0, 0),
-			Size = UDim2.new(0, 24, 1, 0),
+			Position = UDim2.new(1, -32, 25, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
+			Size = UDim2.new(0, 18, 0, 18),
 			Parent = header,
 		})
-
-		local listFrame = create("Frame", {
-			Size = UDim2.new(1, -20, 0, 0),
-			Position = UDim2.fromOffset(10, 50),
-			BackgroundColor3 = Theme.Background,
-			BackgroundTransparency = 0.5,
-			ClipsDescendants = true,
-			Parent = card,
-		})
-		corner(listFrame, 10)
-		stroke(listFrame, Theme.CardBorder, 1, 0.2)
 		
-		local listLayout = create("UIListLayout", {
-			Padding = UDim.new(0, 4),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Parent = listFrame,
-		})
-		padding(listFrame, 8)
-
-		local function refreshLabel()
-			local names = {}
-			for k, v in pairs(selected) do
-				if v then table.insert(names, tostring(k)) end
+		-- Tạo dropdown list
+		local dropdownList = DropdownList.new(
+			self_.Main,
+			list,
+			selected,
+			multi,
+			function(value)
+				task.spawn(callback, value)
+				-- Update label
+				local names = {}
+				if multi then
+					for _, v in ipairs(value) do table.insert(names, tostring(v)) end
+				else
+					names = {tostring(value)}
+				end
+				selectedLabel.Text = (#names == 0) and "Chọn..." or table.concat(names, ", ")
 			end
-			selectedLabel.Text = (#names == 0) and "Chọn..." or table.concat(names, ", ")
+		)
+		
+		-- Update label ban đầu
+		local initialNames = {}
+		for k, v in pairs(selected) do
+			if v then table.insert(initialNames, tostring(k)) end
 		end
-
-		local optionButtons = {}
-		local function buildOptions(newList)
-			if newList then currentList = newList end
-			for _, b in ipairs(optionButtons) do 
-				if b and b.Parent then b:Destroy() end 
-			end
-			optionButtons = {}
-			
-			for _, item in ipairs(currentList) do
-				local optBtn = create("TextButton", {
-					Text = "",
-					AutoButtonColor = false,
-					Size = UDim2.new(1, 0, 0, 32),
-					BackgroundColor3 = Theme.Card,
-					BackgroundTransparency = selected[item] and 0.3 or 1,
-					Parent = listFrame,
-				})
-				corner(optBtn, 8)
-				
-				optBtn.MouseEnter:Connect(function()
-					tween(optBtn, EASE_FAST, { BackgroundTransparency = selected[item] and 0.3 or 0.7 })
-				end)
-				optBtn.MouseLeave:Connect(function()
-					tween(optBtn, EASE_FAST, { BackgroundTransparency = selected[item] and 0.3 or 1 })
-				end)
-				
-				local checkmark = create("ImageLabel", {
-					Image = Icons["lucide-check"],
-					ImageColor3 = Theme.Accent,
-					BackgroundTransparency = 1,
-					Position = UDim2.new(1, -26, 0.5, 0),
-					AnchorPoint = Vector2.new(0, 0.5),
-					Size = UDim2.new(0, 16, 0, 16),
-					Visible = selected[item] and true or false,
-					Parent = optBtn,
-				})
-				
-				create("TextLabel", {
-					Text = tostring(item),
-					Font = Theme.Font, 
-					TextSize = 13,
-					TextColor3 = selected[item] and Theme.AccentLight or Theme.TextSecondary,
-					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(12, 0),
-					Size = UDim2.new(1, -40, 1, 0),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					Parent = optBtn,
-				})
-				
-				optBtn.MouseButton1Click:Connect(function()
-					if multi then
-						selected[item] = not selected[item]
-					else
-						for k in pairs(selected) do selected[k] = false end
-						selected[item] = true
-					end
-					buildOptions()
-					refreshLabel()
-					
-					local result
-					if multi then
-						result = {}
-						for k, v in pairs(selected) do if v then table.insert(result, k) end end
-					else
-						result = item
-					end
-					task.spawn(callback, result)
-				end)
-				table.insert(optionButtons, optBtn)
-			end
-		end
-		buildOptions()
-		refreshLabel()
-
-		local open = false
+		selectedLabel.Text = (#initialNames == 0) and "Chọn..." or table.concat(initialNames, ", ")
+		
+		-- Click để mở dropdown
 		header.MouseButton1Click:Connect(function()
-			open = not open
-			local h = #currentList * 36 + 16
-			if h > 200 then h = 200 end
-			tween(arrow, EASE_FAST, { Rotation = open and 180 or 0 })
-			tween(listFrame, EASE, { Size = UDim2.new(1, -20, 0, open and h or 0) })
-			tween(card, EASE, { Size = UDim2.new(1, 0, 0, open and (50 + h) or 50) })
+			if dropdownList.Visible then
+				dropdownList:Hide()
+			else
+				-- Đóng các dropdown khác
+				for _, d in ipairs(self_.Dropdowns or {}) do
+					if d ~= dropdownList and d.Visible then
+						d:Hide()
+					end
+				end
+				dropdownList:Show()
+			end
 		end)
+		
+		-- Lưu dropdown để quản lý
+		if not self_.Dropdowns then self_.Dropdowns = {} end
+		table.insert(self_.Dropdowns, dropdownList)
 
 		table.insert(self.Elements, { Frame = card, SearchText = name, Type = "Dropdown" })
+		
 		return {
 			Refresh = function(_, newList)
-				buildOptions(newList)
+				list = newList or {}
+				dropdownList:SetOptions(list)
 			end,
 			SetValue = function(_, value)
+				dropdownList:SetSelected(value)
+				local names = {}
 				if multi then
-					selected = {}
 					if typeof(value) == "table" then
-						for _, v in ipairs(value) do selected[v] = true end
+						for _, v in ipairs(value) do table.insert(names, tostring(v)) end
 					end
 				else
-					for k in pairs(selected) do selected[k] = false end
-					selected[value] = true
+					names = {tostring(value)}
 				end
-				buildOptions()
-				refreshLabel()
+				selectedLabel.Text = (#names == 0) and "Chọn..." or table.concat(names, ", ")
 			end,
-			Get = function() 
-				if multi then
-					local result = {}
-					for k, v in pairs(selected) do if v then table.insert(result, k) end end
-					return result
-				else
-					for k, v in pairs(selected) do if v then return k end end
-					return nil
-				end
+			Get = function()
+				return dropdownList:GetSelected()
 			end,
+			Close = function()
+				dropdownList:Hide()
+			end
 		}
 	end
 
