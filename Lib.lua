@@ -1,4 +1,4 @@
--- Window.lua (sửa lỗi, thêm dark mode, toggle, search)
+-- Window.lua (Dark Mode + Toggle + Search, mặc định Parent = CoreGui)
 local UserInputService = game:GetService("UserInputService")
 local Mouse = game:GetService("Players").LocalPlayer:GetMouse()
 local Camera = game:GetService("Workspace").CurrentCamera
@@ -15,8 +15,14 @@ local Instant = Flipper.Instant.new
 local New = Creator.New
 
 return function(Config)
-	assert(Config, "Config is nil")
-	assert(Config.Parent, "Config.Parent is nil – provide a ScreenGui")
+	-- Mặc định Parent là CoreGui nếu không có
+	Config = Config or {}
+	Config.Parent = Config.Parent or game:GetService("CoreGui")
+	Config.Size = Config.Size or UDim2.fromOffset(800, 600)
+	Config.Title = Config.Title or "Window"
+	Config.SubTitle = Config.SubTitle or ""
+	Config.TabWidth = Config.TabWidth or 150
+
 	assert(Config.Size, "Config.Size is missing")
 
 	local Library = require(Root)
@@ -26,7 +32,7 @@ return function(Config)
 		Maximized = false,
 		Size = Config.Size,
 		CurrentPos = 0,
-		TabWidth = Config.TabWidth or 150,
+		TabWidth = Config.TabWidth,
 		Position = UDim2.fromOffset(
 			Camera.ViewportSize.X / 2 - Config.Size.X.Offset / 2,
 			Camera.ViewportSize.Y / 2 - Config.Size.Y.Offset / 2
@@ -40,14 +46,12 @@ return function(Config)
 	local Resizing, ResizePos = false
 	local MinimizeNotif = false
 
-	-- Acrylic
 	Window.AcrylicPaint = Acrylic.AcrylicPaint()
 
-	-- Lưu kích thước cũ
 	local OldSizeX = Window.Size.X.Offset
 	local OldSizeY = Window.Size.Y.Offset
 
-	-- ===== TẠO UI COMPONENTS =====
+	-- ===== UI COMPONENTS =====
 	local Selector = New("Frame", {
 		Size = UDim2.fromOffset(4, 0),
 		BackgroundColor3 = Color3.fromRGB(76, 194, 255),
@@ -100,7 +104,7 @@ return function(Config)
 		ThemeTag = { TextColor3 = "Text" },
 	})
 
-	-- ===== SEARCH FRAME =====
+	-- ===== SEARCH =====
 	Window.SearchFrame = New("Frame", {
 		Size = UDim2.new(0, 200, 0, 30),
 		Position = UDim2.new(1, -220, 0, 54),
@@ -137,7 +141,7 @@ return function(Config)
 	SearchIcon.Parent = Window.SearchFrame
 	Window.SearchBox.Parent = Window.SearchFrame
 
-	-- ===== TOGGLES (Dark Mode & Search toggle) =====
+	-- ===== TOGGLES =====
 	local ToggleFrame = New("Frame", {
 		Size = UDim2.new(0, 70, 0, 30),
 		Position = UDim2.new(1, -80, 0, 10),
@@ -163,14 +167,12 @@ return function(Config)
 	DarkModeToggle.Parent = ToggleFrame
 	SearchToggle.Parent = ToggleFrame
 
-	-- Hàm cập nhật icon (bạn có thể thay icon ID thực tế)
 	local function UpdateToggleIcons()
 		DarkModeToggle.Image = Window.DarkMode and "rbxassetid://6031091010" or "rbxassetid://6031091010"
 		SearchToggle.Image = Window.SearchVisible and "rbxassetid://6031091010" or "rbxassetid://6031091010"
 	end
 	UpdateToggleIcons()
 
-	-- Hàm áp dụng Dark Mode
 	local function ApplyDarkMode(enable)
 		if enable then
 			Window.AcrylicPaint.Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -182,20 +184,17 @@ return function(Config)
 		Window.DarkMode = enable
 	end
 
-	-- Sự kiện cho DarkModeToggle
 	Creator.AddSignal(DarkModeToggle.MouseButton1Click, function()
 		ApplyDarkMode(not Window.DarkMode)
 		UpdateToggleIcons()
 	end)
 
-	-- Sự kiện cho SearchToggle
 	Creator.AddSignal(SearchToggle.MouseButton1Click, function()
 		Window.SearchVisible = not Window.SearchVisible
 		Window.SearchFrame.Visible = Window.SearchVisible
 		UpdateToggleIcons()
 	end)
 
-	-- Sự kiện tìm kiếm: Enter hoặc FocusLost
 	Creator.AddSignal(Window.SearchBox.FocusLost, function(EnterPressed)
 		if EnterPressed and Window.SearchCallback then
 			Window.SearchCallback(Window.SearchBox.Text)
@@ -227,12 +226,12 @@ return function(Config)
 		Window.ContainerHolder
 	})
 
-	-- ===== ROOT FRAME =====
+	-- ===== ROOT =====
 	Window.Root = New("Frame", {
 		BackgroundTransparency = 1,
 		Size = Window.Size,
 		Position = Window.Position,
-		Parent = Config.Parent,
+		Parent = Config.Parent, -- đã được set mặc định CoreGui
 	}, {
 		Window.AcrylicPaint.Frame,
 		Window.TabDisplay,
@@ -243,10 +242,9 @@ return function(Config)
 		ToggleFrame,
 	})
 
-	-- TitleBar
 	Window.TitleBar = require(script.Parent.TitleBar)({
-		Title = Config.Title or "Window",
-		SubTitle = Config.SubTitle or "",
+		Title = Config.Title,
+		SubTitle = Config.SubTitle,
 		Parent = Window.Root,
 		Window = Window,
 	})
@@ -414,7 +412,7 @@ return function(Config)
 		Window.TabHolder.CanvasSize = UDim2.new(0, 0, 0, Window.TabHolder.UIListLayout.AbsoluteContentSize.Y)
 	end)
 
-	-- Minimize keybind (an toàn)
+	-- Minimize keybind an toàn
 	local minimizeKey = Library.MinimizeKeybind and Library.MinimizeKeybind.Value or (Library.MinimizeKey and Library.MinimizeKey.Name)
 	Creator.AddSignal(UserInputService.InputBegan, function(Input)
 		if not UserInputService:GetFocusedTextBox() then
@@ -425,7 +423,6 @@ return function(Config)
 	end)
 
 	-- ===== PUBLIC METHODS =====
-
 	function Window:Minimize()
 		Window.Minimized = not Window.Minimized
 		Window.Root.Visible = not Window.Minimized
@@ -449,13 +446,11 @@ return function(Config)
 		Window.Root:Destroy()
 	end
 
-	-- Dark mode toggle function (gọi từ bên ngoài)
 	function Window:ToggleDarkMode()
 		ApplyDarkMode(not Window.DarkMode)
 		UpdateToggleIcons()
 	end
 
-	-- Set search callback
 	function Window:SetSearchCallback(callback)
 		Window.SearchCallback = callback
 	end
@@ -502,17 +497,12 @@ return function(Config)
 		return TabModule:New(TabConfig.Title, TabConfig.Icon, Window.TabHolder)
 	end
 
-	-- Sửa: SelectTab nhận index (hoặc tên tab) và chọn đúng
 	function Window:SelectTab(index)
-		-- Giả định TabModule có SelectTab(index)
 		if TabModule.SelectTab then
 			TabModule:SelectTab(index)
-		else
-			warn("TabModule không có SelectTab")
 		end
 	end
 
-	-- Cập nhật selector khi cuộn tab
 	Creator.AddSignal(Window.TabHolder:GetPropertyChangedSignal("CanvasPosition"), function()
 		if TabModule.GetCurrentTabPos then
 			LastValue = TabModule:GetCurrentTabPos() + 16
@@ -521,7 +511,7 @@ return function(Config)
 		end
 	end)
 
-	-- Mặc định dark mode: false (có thể set true)
+	-- Mặc định dark mode: false
 	ApplyDarkMode(false)
 	UpdateToggleIcons()
 
