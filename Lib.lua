@@ -2264,3 +2264,5 @@ function FlurioreLib:MakeGui(GuiConfig)
 	end
 	return Tabs
 end
+
+return FlurioreLib
