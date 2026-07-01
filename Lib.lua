@@ -3,6 +3,7 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = game:GetService("Players").LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local CoreGui = LocalPlayer.PlayerGui 
+
 local function MakeDraggable(topbarobject, object)
 	local function CustomPos(topbarobject, object)
 		local Dragging = nil
@@ -104,6 +105,7 @@ local function MakeDraggable(topbarobject, object)
 	CustomSize(object)
 	CustomPos(topbarobject, object)
 end
+
 function CircleClick(Button, X, Y)
 	spawn(function()
 		Button.ClipsDescendants = true
@@ -138,6 +140,7 @@ function CircleClick(Button, X, Y)
 		Circle:Destroy()
 	end)
 end
+
 local FlurioreLib = {}
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = game:GetService("Players").LocalPlayer
@@ -363,6 +366,7 @@ function FlurioreLib:MakeNotify(NotifyConfig)
 	end)
 	return NotifyFunction
 end
+
 function FlurioreLib:MakeGui(GuiConfig)
 	local GuiConfig = GuiConfig or {}
 	GuiConfig.NameHub = GuiConfig.NameHub or "Hirimi Hub"
@@ -635,7 +639,8 @@ function FlurioreLib:MakeGui(GuiConfig)
 	ScrollTab.BackgroundTransparency = 0.9990000128746033
 	ScrollTab.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	ScrollTab.BorderSizePixel = 0
-	ScrollTab.Size = UDim2.new(1, 0, 1, -50)
+	ScrollTab.Size = UDim2.new(1, 0, 1, -80) -- reduced to make room for search bar and Info
+	ScrollTab.Position = UDim2.new(0, 0, 0, 35) -- offset for search bar
 	ScrollTab.Name = "ScrollTab"
 	ScrollTab.Parent = LayersTab
 
@@ -643,10 +648,63 @@ function FlurioreLib:MakeGui(GuiConfig)
 	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	UIListLayout.Parent = ScrollTab
 
+	-- ===== SEARCH BAR FOR TABS (left panel) =====
+	local TabSearchFrame = Instance.new("Frame")
+	TabSearchFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TabSearchFrame.BackgroundTransparency = 0.9
+	TabSearchFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	TabSearchFrame.BorderSizePixel = 0
+	TabSearchFrame.Size = UDim2.new(1, -10, 0, 30)
+	TabSearchFrame.Position = UDim2.new(0, 5, 0, 0)
+	TabSearchFrame.Name = "TabSearchFrame"
+	TabSearchFrame.Parent = LayersTab
+
+	local TabSearchBox = Instance.new("TextBox")
+	TabSearchBox.Font = Enum.Font.GothamBold
+	TabSearchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+	TabSearchBox.PlaceholderText = "Search tabs..."
+	TabSearchBox.Text = ""
+	TabSearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+	TabSearchBox.TextSize = 13
+	TabSearchBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	TabSearchBox.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	TabSearchBox.BorderSizePixel = 0
+	TabSearchBox.Size = UDim2.new(1, 0, 1, 0)
+	TabSearchBox.Name = "TabSearchBox"
+	TabSearchBox.Parent = TabSearchFrame
+
+	local UICornerTabSearch = Instance.new("UICorner")
+	UICornerTabSearch.CornerRadius = UDim.new(0, 4)
+	UICornerTabSearch.Parent = TabSearchFrame
+
+	-- Filter tabs
+	TabSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local query = TabSearchBox.Text:lower()
+		for _, tabFrame in ScrollTab:GetChildren() do
+			if tabFrame:IsA("Frame") and tabFrame.Name == "Tab" then
+				local tabNameLabel = tabFrame:FindFirstChild("TabName")
+				if tabNameLabel then
+					local visible = tabNameLabel.Text:lower():find(query) ~= nil
+					tabFrame.Visible = visible
+				end
+			end
+		end
+		-- Update canvas size
+		local totalHeight = 0
+		for _, child in ScrollTab:GetChildren() do
+			if child:IsA("Frame") and child.Visible then
+				totalHeight = totalHeight + child.Size.Y.Offset + 3
+			end
+		end
+		ScrollTab.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+	end)
+
+	-- ===== END SEARCH BAR FOR TABS =====
+
 	local function UpdateSize1()
 		local OffsetY = 0
 		for _, child in ScrollTab:GetChildren() do
-			if child.Name ~= "UIListLayout" then
+			if child.Name ~= "UIListLayout" and child.Name ~= "TabSearchFrame" then
 				OffsetY = OffsetY + 3 + child.Size.Y.Offset
 			end
 		end
@@ -889,6 +947,112 @@ function FlurioreLib:MakeGui(GuiConfig)
 		ScrolLayers.Size = UDim2.new(1, 0, 1, 0)
 		ScrolLayers.Name = "ScrolLayers"
 		ScrolLayers.Parent = LayersFolder
+
+		-- ===== SEARCH BAR FOR ITEMS (within tab) =====
+		local SearchFrame = Instance.new("Frame")
+		SearchFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		SearchFrame.BackgroundTransparency = 0.9
+		SearchFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		SearchFrame.BorderSizePixel = 0
+		SearchFrame.LayoutOrder = 0
+		SearchFrame.Size = UDim2.new(1, -10, 0, 30)
+		SearchFrame.Position = UDim2.new(0, 5, 0, 0)
+		SearchFrame.Name = "SearchFrame"
+		SearchFrame.Parent = ScrolLayers
+
+		local SearchBox = Instance.new("TextBox")
+		SearchBox.Font = Enum.Font.GothamBold
+		SearchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+		SearchBox.PlaceholderText = "Search items..."
+		SearchBox.Text = ""
+		SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+		SearchBox.TextSize = 13
+		SearchBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+		SearchBox.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		SearchBox.BorderSizePixel = 0
+		SearchBox.Size = UDim2.new(1, 0, 1, 0)
+		SearchBox.Name = "SearchBox"
+		SearchBox.Parent = SearchFrame
+
+		local UICornerSearch = Instance.new("UICorner")
+		UICornerSearch.CornerRadius = UDim.new(0, 4)
+		UICornerSearch.Parent = SearchFrame
+
+		-- Filter function for items
+		local function FilterItems(query)
+			query = query:lower()
+			for _, child in ScrolLayers:GetChildren() do
+				if child:IsA("Frame") and child.Name == "Section" then
+					local sectionVisible = false
+					-- Check section title
+					local titleLabel = child:FindFirstChild("SectionReal") and child.SectionReal:FindFirstChild("SectionTitle")
+					if titleLabel and titleLabel.Text:lower():find(query) then
+						sectionVisible = true
+					end
+					-- Check items inside SectionAdd
+					local sectionAdd = child:FindFirstChild("SectionAdd")
+					if sectionAdd and not sectionVisible then
+						for _, item in sectionAdd:GetChildren() do
+							if item:IsA("Frame") then
+								local itemTitle = nil
+								if item:FindFirstChild("ToggleTitle") then
+									itemTitle = item.ToggleTitle
+								elseif item:FindFirstChild("ButtonTitle") then
+									itemTitle = item.ButtonTitle
+								elseif item:FindFirstChild("ParagraphTitle") then
+									itemTitle = item.ParagraphTitle
+								elseif item:FindFirstChild("SliderTitle") then
+									itemTitle = item.SliderTitle
+								elseif item:FindFirstChild("InputTitle") then
+									itemTitle = item.InputTitle
+								elseif item:FindFirstChild("DropdownTitle") then
+									itemTitle = item.DropdownTitle
+								end
+								if itemTitle and itemTitle.Text:lower():find(query) then
+									sectionVisible = true
+									break
+								end
+							end
+						end
+					end
+					child.Visible = sectionVisible
+				end
+			end
+			-- Update CanvasSize
+			task.wait()
+			local totalHeight = 0
+			for _, child in ScrolLayers:GetChildren() do
+				if child:IsA("Frame") and child.Visible then
+					totalHeight = totalHeight + child.Size.Y.Offset + 3
+				end
+			end
+			ScrolLayers.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+		end
+
+		SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+			FilterItems(SearchBox.Text)
+		end)
+
+		-- Override the UpdateSizeScroll to consider visibility
+		local function UpdateSizeScroll()
+			local totalHeight = 0
+			for _, child in ScrolLayers:GetChildren() do
+				if child:IsA("Frame") and child.Visible then
+					totalHeight = totalHeight + child.Size.Y.Offset + 3
+				end
+			end
+			ScrolLayers.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+		end
+
+		ScrolLayers.ChildAdded:Connect(function()
+			task.wait(0.1)
+			UpdateSizeScroll()
+		end)
+		ScrolLayers.ChildRemoved:Connect(function()
+			task.wait(0.1)
+			UpdateSizeScroll()
+		end)
+		-- ===== END SEARCH BAR =====
 
 		UIListLayout1.Padding = UDim.new(0, 3)
 		UIListLayout1.SortOrder = Enum.SortOrder.LayoutOrder
@@ -1156,8 +1320,10 @@ function FlurioreLib:MakeGui(GuiConfig)
 			local function UpdateSizeScroll()
 				local OffsetY = 0
 				for _, child in ScrolLayers:GetChildren() do
-					if child.Name ~= "UIListLayout" then
-						OffsetY = OffsetY + 3 + child.Size.Y.Offset
+					if child.Name ~= "UIListLayout" and child.Name ~= "SearchFrame" then
+						if child:IsA("Frame") and child.Visible then
+							OffsetY = OffsetY + 3 + child.Size.Y.Offset
+						end
 					end
 				end
 				ScrolLayers.CanvasSize = UDim2.new(0, 0, 0, OffsetY)
@@ -1413,7 +1579,11 @@ function FlurioreLib:MakeGui(GuiConfig)
 				ToggleConfig.Content = ToggleConfig.Content or "Content"
 				ToggleConfig.Default = ToggleConfig.Default or false
 				ToggleConfig.Callback = ToggleConfig.Callback or function() end
-				local ToggleFunc = {Value = ToggleConfig.Default, Options = ToggleConfig.Options, Selecting = ToggleConfig.Selecting}
+				-- NEW: Config Toggle support
+				ToggleConfig.ConfigToggle = ToggleConfig.ConfigToggle or false
+				ToggleConfig.ConfigCallback = ToggleConfig.ConfigCallback or function() end
+
+				local ToggleFunc = {Value = ToggleConfig.Default}
 
 				local Toggle = Instance.new("Frame");
 				local UICorner20 = Instance.new("UICorner");
@@ -1533,12 +1703,60 @@ function FlurioreLib:MakeGui(GuiConfig)
 
 				UICorner23.CornerRadius = UDim.new(0, 15)
 				UICorner23.Parent = ToggleCircle
-				
+
+				-- Config Toggle (if enabled)
+				if ToggleConfig.ConfigToggle then
+					local ConfigFrame = Instance.new("Frame")
+					ConfigFrame.AnchorPoint = Vector2.new(1, 0.5)
+					ConfigFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					ConfigFrame.BackgroundTransparency = 0.999
+					ConfigFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+					ConfigFrame.BorderSizePixel = 0
+					ConfigFrame.Position = UDim2.new(1, -65, 0.5, 0)
+					ConfigFrame.Size = UDim2.new(0, 25, 0, 25)
+					ConfigFrame.Name = "ConfigFrame"
+					ConfigFrame.Parent = Toggle
+
+					local ConfigToggleImage = Instance.new("ImageLabel")
+					ConfigToggleImage.Image = "rbxassetid://10734950309"
+					ConfigToggleImage.AnchorPoint = Vector2.new(0.5, 0.5)
+					ConfigToggleImage.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					ConfigToggleImage.BackgroundTransparency = 0.999
+					ConfigToggleImage.BorderColor3 = Color3.fromRGB(0, 0, 0)
+					ConfigToggleImage.BorderSizePixel = 0
+					ConfigToggleImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+					ConfigToggleImage.Size = UDim2.new(1, -4, 1, -4)
+					ConfigToggleImage.Name = "ConfigToggleImage"
+					ConfigToggleImage.Parent = ConfigFrame
+
+					local ConfigToggleButton = Instance.new("TextButton")
+					ConfigToggleButton.Font = Enum.Font.SourceSans
+					ConfigToggleButton.Text = ""
+					ConfigToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+					ConfigToggleButton.TextSize = 14
+					ConfigToggleButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+					ConfigToggleButton.BackgroundTransparency = 0.999
+					ConfigToggleButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+					ConfigToggleButton.BorderSizePixel = 0
+					ConfigToggleButton.Size = UDim2.new(1, 0, 1, 0)
+					ConfigToggleButton.Name = "ConfigToggleButton"
+					ConfigToggleButton.Parent = ConfigFrame
+
+					ConfigToggleButton.MouseButton1Click:Connect(function()
+						CircleClick(ConfigToggleButton, Mouse.X, Mouse.Y)
+						ToggleConfig.ConfigCallback()
+					end)
+
+					-- Adjust main toggle position to make room
+					FeatureFrame2.Position = UDim2.new(1, -65, 0.5, 0)
+				end
+
 				ToggleButton.MouseButton1Click:Connect(function()
 					CircleClick(ToggleButton, Mouse.X, Mouse.Y) 
 					ToggleFunc.Value = not ToggleFunc.Value
 					ToggleFunc:Set(ToggleFunc.Value)
 				end)
+
 				function ToggleFunc:Set(Value)
 					ToggleConfig.Callback(Value)
 					if Value then
