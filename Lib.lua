@@ -1579,13 +1579,7 @@ function FlurioreLib:MakeGui(GuiConfig)
 				ToggleConfig.Content = ToggleConfig.Content or "Content"
 				ToggleConfig.Default = ToggleConfig.Default or false
 				ToggleConfig.Callback = ToggleConfig.Callback or function() end
-				-- Config Toggle support: opens a dropdown-style option list (reuses the
-				-- MoreBlur / DropdownSelect / DropdownFolder mechanism from AddDropdown)
-				ToggleConfig.ConfigToggle = ToggleConfig.ConfigToggle or false
-				ToggleConfig.ConfigOptions = ToggleConfig.ConfigOptions or {}
-				ToggleConfig.ConfigCallback = ToggleConfig.ConfigCallback or function() end
-
-				local ToggleFunc = {Value = ToggleConfig.Default}
+				local ToggleFunc = {Value = ToggleConfig.Default, Options = ToggleConfig.Options, Selecting = ToggleConfig.Selecting}
 
 				local Toggle = Instance.new("Frame");
 				local UICorner20 = Instance.new("UICorner");
@@ -1705,186 +1699,12 @@ function FlurioreLib:MakeGui(GuiConfig)
 
 				UICorner23.CornerRadius = UDim.new(0, 15)
 				UICorner23.Parent = ToggleCircle
-
-				local ToggleFunc = ToggleFunc -- keep local reference readable
-				-- Config Toggle (dropdown-style extra options for this toggle)
-				if ToggleConfig.ConfigToggle then
-					local ConfigFrame = Instance.new("Frame")
-					ConfigFrame.AnchorPoint = Vector2.new(1, 0.5)
-					ConfigFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					ConfigFrame.BackgroundTransparency = 0.999
-					ConfigFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-					ConfigFrame.BorderSizePixel = 0
-					ConfigFrame.Position = UDim2.new(1, -65, 0.5, 0)
-					ConfigFrame.Size = UDim2.new(0, 25, 0, 25)
-					ConfigFrame.Name = "ConfigFrame"
-					ConfigFrame.Parent = Toggle
-
-					local ConfigToggleImage = Instance.new("ImageLabel")
-					ConfigToggleImage.Image = "rbxassetid://10734950309"
-					-- FIX: missing AnchorPoint made the icon render offset (bottom-right)
-					-- instead of centered inside ConfigFrame. Anchor must match Position.
-					ConfigToggleImage.AnchorPoint = Vector2.new(0.5, 0.5)
-					ConfigToggleImage.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					ConfigToggleImage.BackgroundTransparency = 0.999
-					ConfigToggleImage.BorderColor3 = Color3.fromRGB(0, 0, 0)
-					ConfigToggleImage.BorderSizePixel = 0
-					ConfigToggleImage.Position = UDim2.new(0.5, 0, 0.5, 0)
-					ConfigToggleImage.Size = UDim2.new(1, -4, 1, -4)
-					ConfigToggleImage.Name = "ConfigToggleImage"
-					ConfigToggleImage.Parent = ConfigFrame
-
-					local ConfigToggleButton = Instance.new("TextButton")
-					ConfigToggleButton.Font = Enum.Font.SourceSans
-					ConfigToggleButton.Text = ""
-					ConfigToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-					ConfigToggleButton.TextSize = 14
-					ConfigToggleButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-					ConfigToggleButton.BackgroundTransparency = 0.999
-					ConfigToggleButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
-					ConfigToggleButton.BorderSizePixel = 0
-					ConfigToggleButton.Size = UDim2.new(1, 0, 1, 0)
-					ConfigToggleButton.Name = "ConfigToggleButton"
-					ConfigToggleButton.Parent = ConfigFrame
-
-					-- ===== Build a dropdown-style option list for this toggle,
-					-- reusing the same MoreBlur / DropdownSelect / DropdownFolder
-					-- panel that Items:AddDropdown uses. =====
-					local ScrollConfig = Instance.new("ScrollingFrame");
-					local UIListLayoutConfig = Instance.new("UIListLayout");
-
-					ScrollConfig.CanvasSize = UDim2.new(0, 0, 0, 0)
-					ScrollConfig.ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0)
-					ScrollConfig.ScrollBarThickness = 0
-					ScrollConfig.Active = true
-					ScrollConfig.LayoutOrder = CountDropdown
-					ScrollConfig.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					ScrollConfig.BackgroundTransparency = 0.9990000128746033
-					ScrollConfig.BorderColor3 = Color3.fromRGB(0, 0, 0)
-					ScrollConfig.BorderSizePixel = 0
-					ScrollConfig.Size = UDim2.new(1, 0, 1, 0)
-					ScrollConfig.Name = "ScrollConfig"
-					ScrollConfig.Parent = DropdownFolder
-
-					UIListLayoutConfig.Padding = UDim.new(0, 3)
-					UIListLayoutConfig.SortOrder = Enum.SortOrder.LayoutOrder
-					UIListLayoutConfig.Parent = ScrollConfig
-
-					local ConfigDropCount = 0
-					local ConfigPageIndex = CountDropdown
-
-					local function AddConfigOption(OptionName)
-						OptionName = OptionName or "Option"
-						local Option = Instance.new("Frame");
-						local UICorner37 = Instance.new("UICorner");
-						local OptionButton = Instance.new("TextButton");
-						local OptionText = Instance.new("TextLabel")
-
-						Option.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-						Option.BackgroundTransparency = 0.999
-						Option.BorderColor3 = Color3.fromRGB(0, 0, 0)
-						Option.BorderSizePixel = 0
-						Option.LayoutOrder = ConfigDropCount
-						Option.Size = UDim2.new(1, 0, 0, 30)
-						Option.Name = "Option"
-						Option.Parent = ScrollConfig
-
-						UICorner37.CornerRadius = UDim.new(0, 3)
-						UICorner37.Parent = Option
-
-						OptionButton.Font = Enum.Font.GothamBold
-						OptionButton.Text = ""
-						OptionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-						OptionButton.TextSize = 13
-						OptionButton.TextXAlignment = Enum.TextXAlignment.Left
-						OptionButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-						OptionButton.BackgroundTransparency = 0.9990000128746033
-						OptionButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
-						OptionButton.BorderSizePixel = 0
-						OptionButton.Size = UDim2.new(1, 0, 1, 0)
-						OptionButton.Name = "OptionButton"
-						OptionButton.Parent = Option
-
-						OptionText.Font = Enum.Font.GothamBold
-						OptionText.Text = OptionName
-						OptionText.TextSize = 13
-						OptionText.TextColor3 = Color3.fromRGB(230.77499270439148, 230.77499270439148, 230.77499270439148)
-						OptionText.TextXAlignment = Enum.TextXAlignment.Left
-						OptionText.TextYAlignment = Enum.TextYAlignment.Top
-						OptionText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-						OptionText.BackgroundTransparency = 0.9990000128746033
-						OptionText.BorderColor3 = Color3.fromRGB(0, 0, 0)
-						OptionText.BorderSizePixel = 0
-						OptionText.Position = UDim2.new(0, 8, 0, 8)
-						OptionText.Size = UDim2.new(1, -16, 0, 13)
-						OptionText.Name = "OptionText"
-						OptionText.Parent = Option
-
-						OptionButton.MouseButton1Click:Connect(function()
-							CircleClick(OptionButton, Mouse.X, Mouse.Y)
-							ToggleConfig.ConfigCallback(OptionName)
-							-- close the panel after picking, same as ConnectButton does
-							TweenService:Create(MoreBlur, TweenInfo.new(0.3), {BackgroundTransparency = 0.999}):Play()
-							TweenService:Create(DropdownSelect, TweenInfo.new(0.3), {Position = UDim2.new(1, 172, 0.5, 0)}):Play()
-							task.wait(0.3)
-							MoreBlur.Visible = false
-						end)
-
-						local OffsetY = 0
-						for _, child in ScrollConfig:GetChildren() do
-							if child.Name ~= "UIListLayout" then
-								OffsetY = OffsetY + 3 + child.Size.Y.Offset
-							end
-						end
-						ScrollConfig.CanvasSize = UDim2.new(0, 0, 0, OffsetY)
-						ConfigDropCount = ConfigDropCount + 1
-					end
-
-					for _, OptionName in ipairs(ToggleConfig.ConfigOptions) do
-						AddConfigOption(OptionName)
-					end
-
-					-- Clicking the gear/config icon opens the shared dropdown panel
-					-- and jumps straight to this toggle's option page, exactly like
-					-- DropdownButton does for Items:AddDropdown.
-					ConfigToggleButton.MouseButton1Click:Connect(function()
-						CircleClick(ConfigToggleButton, Mouse.X, Mouse.Y)
-						if not MoreBlur.Visible then
-							MoreBlur.Visible = true
-							DropPageLayout:JumpToIndex(ConfigPageIndex)
-							TweenService:Create(MoreBlur, TweenInfo.new(0.3), {BackgroundTransparency = 0.7}):Play()
-							TweenService:Create(DropdownSelect, TweenInfo.new(0.3), {Position = UDim2.new(1, -11, 0.5, 0)}):Play()
-						end
-					end)
-
-					CountDropdown = CountDropdown + 1
-
-					-- Expose a way to add/refresh options after creation
-					function ToggleFunc:AddConfigOption(OptionName)
-						AddConfigOption(OptionName)
-					end
-					function ToggleFunc:RefreshConfigOptions(OptionsList)
-						for _, child in ScrollConfig:GetChildren() do
-							if child.Name == "Option" then
-								child:Destroy()
-							end
-						end
-						ConfigDropCount = 0
-						for _, OptionName in ipairs(OptionsList or {}) do
-							AddConfigOption(OptionName)
-						end
-					end
-
-					-- Adjust main toggle position to make room
-					FeatureFrame2.Position = UDim2.new(1, -65, 0.5, 0)
-				end
-
+				
 				ToggleButton.MouseButton1Click:Connect(function()
 					CircleClick(ToggleButton, Mouse.X, Mouse.Y) 
 					ToggleFunc.Value = not ToggleFunc.Value
 					ToggleFunc:Set(ToggleFunc.Value)
 				end)
-
 				function ToggleFunc:Set(Value)
 					ToggleConfig.Callback(Value)
 					if Value then
